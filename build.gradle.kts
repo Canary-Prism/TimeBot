@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "canaryprism"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 application {
     mainClass = "canaryprism.timebot.Main"
