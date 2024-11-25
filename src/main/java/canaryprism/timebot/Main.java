@@ -20,17 +20,9 @@ public class Main implements Runnable {
     
     private static final ProjectDirectories DIRS = ProjectDirectories.from("", "canaryprism", "TimeBot");
     
-    @CommandLine.Option(names = "--log-level")
-    private String log_level;
-    
-    private Level getLogLevel() {
-        return Level.toLevel(log_level, Level.INFO);
-    }
     
     @Override
     public void run() {
-        Configurator.setRootLevel(getLogLevel());
-        
         
         try {
             var config_path = Path.of(DIRS.configDir);
