@@ -15,6 +15,7 @@ public class BirthdayData {
     private volatile Integer year;
     private volatile int month;
     private volatile int day;
+    private volatile int hour;
     
     private volatile int next_birthday_year;
     
@@ -29,6 +30,7 @@ public class BirthdayData {
         this.year = json.optIntegerObject("year", null);
         this.month = json.getInt("month");
         this.day = json.getInt("day");
+        this.hour = json.getInt("hour");
         
         this.next_birthday_year = json.getInt("next_birthday_year");
         
@@ -43,6 +45,7 @@ public class BirthdayData {
         return json
                 .put("month", month)
                 .put("day", day)
+                .put("hour", hour)
                 .put("next_birthday_year", next_birthday_year)
                 .put("channel", channel.getId());
     }
@@ -54,6 +57,7 @@ public class BirthdayData {
         this.year = (time.getYear() != -1) ? time.getYear() : null;
         this.month = time.getMonthValue();
         this.day = time.getDayOfMonth();
+        this.hour = time.getHour();
         
         
         var now = ZonedDateTime.now(zone);
@@ -61,15 +65,15 @@ public class BirthdayData {
         this.next_birthday_year = now.getYear();
         
         var this_year_birthday = ZonedDateTime.of(now.getYear(), month, day,
-                0, 0, 0, 0, zone);
+                hour, 0, 0, 0, ZoneOffset.UTC);
         
-        if (this_year_birthday.compareTo(now) <= 0)
+        if (this_year_birthday.isBefore(now))
             next_birthday_year++;
     }
     
     public synchronized Instant getNextBirthday() {
         return ZonedDateTime.of(next_birthday_year, month, day,
-                0, 0, 0, 0, ZoneOffset.UTC).toInstant();
+                hour, 0, 0, 0, ZoneOffset.UTC).toInstant();
     }
     
     public synchronized void birthdayNotified() {

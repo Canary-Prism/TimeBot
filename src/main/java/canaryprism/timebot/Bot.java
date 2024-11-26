@@ -57,7 +57,7 @@ public class Bot {
             .setMentionRepliedUser(false)
             .build();
     
-    private static final DateTimeFormatter DEFAULT_FORMATTER_NO_YEAR = DateTimeFormatter.ofPattern("MM/dd hh:mm:ss (zzz)");
+    private static final DateTimeFormatter DEFAULT_FORMATTER_NO_YEAR = DateTimeFormatter.ofPattern("MM/dd HH:mm:ss (zzz)");
     
     private final DiscordApi api;
     private final Path save_file;
@@ -140,7 +140,14 @@ public class Bot {
             
             var channel = birthday.getChannel();
             
-            channel.sendMessage(String.format("Today is %s's birthday! Happy birthday!", data.getUser().getMentionTag()));
+            if (birthday.getAge().isPresent()) {
+                channel.sendMessage(String.format("Today is %s's birthday! They're now %s years old! Happy birthday!", data.getUser().getMentionTag(), birthday.getAge().get()));
+            } else {
+                channel.sendMessage(String.format("Today is %s's birthday! Happy birthday!", data.getUser().getMentionTag()));
+            }
+            
+            birthday.birthdayNotified();
+            this.update();
         }
         
         public synchronized void update() {
@@ -352,7 +359,7 @@ public class Bot {
                 }
             }
             
-            @SearchSuggestions(at = MatchStart.ANYWHERE)
+            @SearchSuggestions(at = MatchStart.ANYWHERE, ignorePunctuation = true)
             @Autocompleter
             List<AutocompleteSuggestion<String>> getTimezones(String input) {
                 var list = new ArrayList<AutocompleteSuggestion<String>>();
@@ -548,7 +555,7 @@ public class Bot {
             }
         }
         
-        @SearchSuggestions(at = MatchStart.ANYWHERE)
+        @SearchSuggestions(at = MatchStart.ANYWHERE, ignorePunctuation = true)
         @Autocompleter
         List<AutocompleteSuggestion<String>> getLocales(String input) {
             var list = new ArrayList<AutocompleteSuggestion<String>>();
@@ -659,11 +666,61 @@ public class Bot {
                     if (!(channel instanceof TextableRegularServerChannel text_channel))
                         return "Not a textable channel";
                     
+                    if (bot_data.getServerData(server)
+                            .map(ServerData::getAllowedBirthdayChannels)
+                            .map((e) -> e.contains(text_channel))
+                            .orElse(false))
+                        return String.format("%s already an allowed birthday channel", text_channel.getMentionTag());
+                    
                     var data = bot_data.obtainServerData(server);
                     
                     data.addAllowedBirthdayChannel(text_channel);
                     
+                    saveAsync();
+                    
                     return String.format("Added %s to allowed birthday notification channels", text_channel.getMentionTag());
+                }
+                
+                @Command(name = "remove", description = "remove allowed birthday channel")
+                @ReturnsResponse(ephemeral = true)
+                String remove(
+                        @Interaction SlashCommandInteraction interaction,
+                        @Option(name = "target_channel", description = "the channel to disallow") RegularServerChannel target_channel,
+                        @Option(name = "fallback_channel", description = "the channel to set birthdays targeting target_channel to change to") RegularServerChannel fallback_channel
+                ) {
+                    var server = interaction.getServer().orElseThrow();
+                    
+                    if (!(target_channel instanceof TextableRegularServerChannel target_text_channel))
+                        return String.format("<#%s> not a textable channel", target_channel.getIdAsString());
+                    
+                    if (!(fallback_channel instanceof TextableRegularServerChannel fallback_text_channel))
+                        return String.format("<#%s> not a textable channel", fallback_channel.getIdAsString());
+                    
+                    var data = bot_data.getServerData(server);
+                    
+                    if (!data.map(ServerData::getAllowedBirthdayChannels)
+                            .map((e) -> e.contains(target_text_channel))
+                            .orElse(false))
+                        return String.format("%s isn't an allowed birthday channel", target_text_channel.getMentionTag());
+                    
+                    if (!data.map(ServerData::getAllowedBirthdayChannels)
+                            .map((e) -> e.contains(fallback_text_channel))
+                            .orElse(false))
+                        return String.format("%s isn't an allowed birthday channel", fallback_text_channel.getMentionTag());
+                    
+                    data.get().removeAllowedBirthdayChannel(target_text_channel);
+                    
+                    data.map(ServerData::getUsers)
+                            .stream()
+                            .flatMap(Set::stream)
+                            .map(UserData::getBirthdayData)
+                            .flatMap(Optional::stream)
+                            .filter((e) -> e.getChannel().equals(target_text_channel))
+                            .forEach((e) -> e.setChannel(fallback_text_channel));
+                    
+                    saveAsync();
+                    
+                    return String.format("Removed %s from allowed birthday channels", target_text_channel.getMentionTag());
                 }
             }
         }
@@ -691,6 +748,27 @@ public class Bot {
                 
                 if (!(channel instanceof TextableRegularServerChannel text_channel))
                     return String.format("<#%s> not a textable channel", channel.getIdAsString());
+                
+                var allowed_channels = bot_data.getServerData(server)
+                        .map(ServerData::getAllowedBirthdayChannels);
+                
+                if (!allowed_channels.map((e) -> e.contains(channel)).orElse(false)) {
+                    if (allowed_channels.map(Set::isEmpty).orElse(true))
+                        return "This server doesn't allow any birthday notifications";
+                    else
+                        return String.format("""
+                                %s is not in the allowed birthday notification channels
+                                allowed channels: %s
+                                """,
+                                text_channel.getMentionTag(),
+                                allowed_channels.map((set) ->
+                                        set.stream()
+                                                .map((e) -> "\n" + e.getMentionTag())
+                                                .reduce("", (a, b) -> a + b)
+                                ).orElse("")
+                        );
+                }
+                
                 
                 var timezone = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(interaction.getUser()))
