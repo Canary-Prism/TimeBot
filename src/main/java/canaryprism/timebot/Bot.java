@@ -4,12 +4,14 @@ import canaryprism.slavacord.CommandHandler;
 import canaryprism.slavacord.Commands;
 import canaryprism.slavacord.CustomChoiceName;
 import canaryprism.slavacord.annotations.*;
+import canaryprism.slavacord.annotations.optionbounds.LongBounds;
 import canaryprism.slavacord.annotations.optionbounds.StringLengthBounds;
 import canaryprism.slavacord.autocomplete.AutocompleteSuggestion;
 import canaryprism.slavacord.autocomplete.annotations.Autocompleter;
 import canaryprism.slavacord.autocomplete.annotations.Autocompletes;
 import canaryprism.slavacord.autocomplete.annotations.SearchSuggestions;
 import canaryprism.slavacord.autocomplete.filteroptions.MatchStart;
+import canaryprism.timebot.data.BirthdayData;
 import canaryprism.timebot.data.BotData;
 import canaryprism.timebot.data.ServerData;
 import canaryprism.timebot.data.UserData;
@@ -17,9 +19,12 @@ import org.apache.commons.lang3.LocaleUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.javacord.api.DiscordApi;
+import org.javacord.api.entity.channel.RegularServerChannel;
+import org.javacord.api.entity.channel.TextableRegularServerChannel;
 import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.message.mention.AllowedMentions;
 import org.javacord.api.entity.message.mention.AllowedMentionsBuilder;
+import org.javacord.api.entity.permission.PermissionType;
 import org.javacord.api.entity.user.User;
 import org.javacord.api.interaction.DiscordLocale;
 import org.javacord.api.interaction.SlashCommandInteraction;
@@ -34,10 +39,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.FormatStyle;
 import java.time.temporal.TemporalAccessor;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Bot {
     
@@ -54,10 +57,14 @@ public class Bot {
             .setMentionRepliedUser(false)
             .build();
     
+    private static final DateTimeFormatter DEFAULT_FORMATTER_NO_YEAR = DateTimeFormatter.ofPattern("MM/dd hh:mm:ss (zzz)");
+    
     private final DiscordApi api;
     private final Path save_file;
     private final CommandHandler command_handler;
     private final BotData bot_data;
+    
+    private final Timer timer = new Timer("birthday_timer");
     
     public Bot(DiscordApi api, Path save_file) {
         this.api = api;
@@ -102,8 +109,111 @@ public class Bot {
     
     public void start() {
         logger.info("Starting Bot");
+        
+        
         command_handler.register(new BotCommands(), true);
+        
+        
+        refreshBirthdayTimers();
+        
         logger.info("Bot started normally");
+    }
+    
+    class BirthdayTask extends TimerTask {
+        
+        private final UserData data;
+        
+        private final Instant target_time;
+        
+        BirthdayTask(UserData data) {
+            this.data = data;
+            this.target_time = data.getBirthdayData().orElseThrow().getNextBirthday();
+        }
+        
+        public void schedule() {
+            timer.schedule(this, Date.from(target_time));
+        }
+        
+        @Override
+        public void run() {
+            var birthday = data.getBirthdayData().orElseThrow();
+            
+            var channel = birthday.getChannel();
+            
+            channel.sendMessage(String.format("Today is %s's birthday! Happy birthday!", data.getUser().getMentionTag()));
+        }
+        
+        public synchronized void update() {
+            logger.info("updating timer for user {}", data.getUser());
+            synchronized (data) {
+                if (!data.getBirthdayData().map(BirthdayData::getNextBirthday).map(target_time::equals).orElse(false)) {
+                    var opt_birthday = data.getBirthdayData();
+                    if (opt_birthday.isPresent()) {
+                        logger.info("time changed, rescheduling to {}...",
+                                () -> data.getBirthdayData().map(BirthdayData::getNextBirthday));
+                        
+                        this.cancel();
+                        
+                        var new_task = new BirthdayTask(data);
+                        
+                        synchronized (birthday_tasks) {
+                            birthday_tasks.remove(this);
+                            birthday_tasks.add(new_task);
+                        }
+                        
+                        new_task.schedule();
+                    } else {
+                        logger.info("birthday removed, cancelling task");
+                        
+                        this.cancel();
+                        
+                        synchronized (birthday_tasks) {
+                            birthday_tasks.remove(this);
+                        }
+                    }
+                }
+            }
+        }
+        
+    }
+    
+    private final Set<BirthdayTask> birthday_tasks = new HashSet<>();
+    
+    private void refreshBirthdayTimersAsync() {
+        Thread.ofVirtual().start(this::refreshBirthdayTimers);
+    }
+    
+    private void refreshBirthdayTimers() {
+        logger.info("refreshing birthday timers");
+        
+        Set<UserData> birthday_users;
+        synchronized (birthday_tasks) {
+            birthday_users = birthday_tasks.stream()
+                    .map((e) -> e.data)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+        
+        bot_data.getServers()
+                .stream()
+                .flatMap((e) -> e.getUsers().stream())
+                .filter((e) -> e.getBirthdayData().isPresent())
+                .filter((e) -> !birthday_users.contains(e))
+                .forEach((e) -> {
+                    var task = new BirthdayTask(e);
+                    
+                    logger.info("new timer for user {}", e.getUser());
+                    
+                    synchronized (birthday_tasks) {
+                        birthday_tasks.add(task);
+                    }
+                    
+                    task.schedule();
+                });
+        
+        synchronized (birthday_tasks) {
+            for (var e : birthday_tasks)
+                e.update();
+        }
     }
     
     enum ResponderFlags implements CustomChoiceName {
@@ -497,5 +607,156 @@ public class Bot {
 
             return formatter.format(time);
         }
+        
+        @RequiresPermissions(PermissionType.MANAGE_MESSAGES)
+        @CommandGroup(name = "moderation", enabledInDMs = false)
+        class Moderation {
+            
+            @CommandGroup(name = "forcemessageflag")
+            class ForceMessageFlag {
+                @Command(name = "set", description = "Force /time responses to use a specific message flag")
+                @ReturnsResponse(ephemeral = true)
+                String set(
+                        @Interaction SlashCommandInteraction interaction,
+                        @Option(name = "flag", description = "the flag to set, if empty removes the forced message flag") Optional<ResponderFlags> opt_flag
+                ) {
+                    var server = interaction.getServer().orElseThrow();
+                    
+                    var data = bot_data.obtainServerData(server);
+                    
+                    data.forceMessageFlag(opt_flag.map(ResponderFlags::getMessageFlag).orElse(null));
+                    
+                    saveAsync();
+                    
+                    return opt_flag.map(responderFlags ->
+                                    String.format("Set server to force %s messages", responderFlags.name()))
+                            .orElse("Set server to not force any message flags");
+                }
+                
+                @Command(name = "get", description = "get forced message flag for /time responses")
+                @ReturnsResponse(ephemeral = true)
+                String get(@Interaction SlashCommandInteraction interaction) {
+                    var server = interaction.getServer().orElseThrow();
+                    
+                    return bot_data.getServerData(server)
+                            .flatMap(ServerData::getForcedMessageFlag)
+                            .map((e) ->
+                                    String.format("Server currently forces %s messages", e))
+                            .orElse("Server currently doesn't force any message flags");
+                }
+            }
+            
+            @CommandGroup(name = "birthdaychannel")
+            class BirthdayChannel {
+                @Command(name = "add", description = "add allowed birthday channel")
+                @ReturnsResponse(ephemeral = true)
+                String add(
+                        @Interaction SlashCommandInteraction interaction,
+                        @Option(name = "channel", description = "the channel to allow") RegularServerChannel channel
+                ) {
+                    var server = interaction.getServer().orElseThrow();
+                    
+                    if (!(channel instanceof TextableRegularServerChannel text_channel))
+                        return "Not a textable channel";
+                    
+                    var data = bot_data.obtainServerData(server);
+                    
+                    data.addAllowedBirthdayChannel(text_channel);
+                    
+                    return String.format("Added %s to allowed birthday notification channels", text_channel.getMentionTag());
+                }
+            }
+        }
+        
+        @CommandGroup(name = "birthday", enabledInDMs = false)
+        class Birthday {
+            
+            @Command(name = "set", description = "set your birthday to send a message for")
+            @ReturnsResponse(ephemeral = true)
+            String set(
+                    @Interaction SlashCommandInteraction interaction,
+                    
+                    @Option(name = "channel", description = "channel to send message to") RegularServerChannel channel,
+                    
+                    @LongBounds(min = 1, max = 31)
+                    @Option(name = "day") long long_day,
+                    
+                    @LongBounds(min = 1, max = 12)
+                    @Option(name = "month") long long_month,
+                    
+                    @LongBounds(min = 0)
+                    @Option(name = "year", description = "birth year (to track age, optional)") Optional<Long> long_year
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                
+                if (!(channel instanceof TextableRegularServerChannel text_channel))
+                    return String.format("<#%s> not a textable channel", channel.getIdAsString());
+                
+                var timezone = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(interaction.getUser()))
+                        .flatMap(UserData::getTimezone)
+                        .orElse(ZoneOffset.UTC);
+                int year = long_year.orElse(-1L).intValue(), month = ((int) long_month), day = ((int) long_day);
+                
+                try {
+                    var birthday = ZonedDateTime.of(year, month, day,
+                            0, 0, 0, 0, timezone);
+                    
+                    // we hate people born on this stupid date
+                    //noinspection MagicNumber
+                    if (birthday.getMonthValue() == 2 && birthday.getDayOfMonth() == 29)
+                        throw new DateTimeException("Febrary 29th not allowed");
+                    
+                    var data = bot_data.obtainServerData(server)
+                            .obtainUserData(interaction.getUser());
+                    
+                    var birthday_data = new BirthdayData(birthday, text_channel);
+                    
+                    data.setBirthdayData(birthday_data);
+                    
+                    DateTimeFormatter formatter;
+                    if (long_year.isPresent()) {
+                        formatter = DEFAULT_FORMATTER;
+                    } else {
+                        formatter = DEFAULT_FORMATTER_NO_YEAR;
+                    }
+                    
+                    var locale = data.getLocale().orElse(convertLocale(interaction.getLocale()));
+                    
+                    formatter = formatter.withLocale(locale);
+                    
+                    refreshBirthdayTimersAsync();
+                    
+                    saveAsync();
+                    
+                    return String.format("Set birthday notification to %s", formatter.format(birthday));
+                } catch (DateTimeException e) {
+                    return String.format("Invalid date: %s", e.getMessage());
+                }
+            }
+            
+            @Command(name = "remove", description = "remove birthday notification")
+            @ReturnsResponse(ephemeral = true)
+            String remove(@Interaction SlashCommandInteraction interaction) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                
+                var data = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user));
+                
+                if (data.flatMap(UserData::getBirthdayData).isEmpty())
+                    return "You don't have any birthday data";
+                
+                data.get().setBirthdayData(null);
+                
+                refreshBirthdayTimersAsync();
+                
+                saveAsync();
+                
+                return "Removed birthday data";
+            }
+        
+        }
+        
     }
 }

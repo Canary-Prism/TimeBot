@@ -5,10 +5,7 @@ import org.javacord.api.entity.server.Server;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class BotData {
@@ -52,6 +49,12 @@ public class BotData {
     public ServerData obtainServerData(Server server) {
         synchronized (servers) {
             return servers.computeIfAbsent(Objects.requireNonNull(server, "server cannot be null"), ServerData::new);
+        }
+    }
+    
+    public Set<? extends ServerData> getServers() {
+        synchronized (servers) {
+            return Set.copyOf(servers.values());
         }
     }
 }

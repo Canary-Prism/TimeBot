@@ -20,6 +20,8 @@ public class UserData {
     private volatile Locale locale;
     private volatile Boolean timezone_visible;
     
+    private volatile BirthdayData birthday_data;
+    
     public UserData(User user) {
         this.user = Objects.requireNonNull(user, "user cannot be null");
     }
@@ -39,6 +41,10 @@ public class UserData {
                 .orElse(null);
         
         this.timezone_visible = json.optBooleanObject("timezone_visible", null);
+        
+        this.birthday_data = Optional.ofNullable(json.optJSONObject("birthday"))
+                .map((e) -> new BirthdayData(e, api))
+                .orElse(null);
     }
     
     public synchronized JSONObject toJSON() {
@@ -53,6 +59,8 @@ public class UserData {
         getLocale().ifPresent((locale) -> json.put("locale", locale.toLanguageTag()));
         
         isTimezoneVisible().ifPresent((state) -> json.put("timezone_visible", state));
+        
+        getBirthdayData().ifPresent((birthday) -> json.put("birthday", birthday.toJSON()));
         
         return json;
     }
@@ -83,21 +91,30 @@ public class UserData {
         this.formatter = formatter_string.map(DateTimeFormatter::ofPattern).orElse(null);
     }
     
-    public Optional<Locale> getLocale() {
+    public synchronized Optional<Locale> getLocale() {
         return Optional.ofNullable(locale);
     }
     
-    public void setLocale(Locale locale) {
+    public synchronized void setLocale(Locale locale) {
         this.locale = locale;
     }
     
-    public Optional<Boolean> isTimezoneVisible() {
+    public synchronized Optional<Boolean> isTimezoneVisible() {
         return Optional.ofNullable(timezone_visible);
     }
     
-    public void setTimezoneVisible(Boolean timezone_visible) {
+    public synchronized void setTimezoneVisible(Boolean timezone_visible) {
         this.timezone_visible = timezone_visible;
     }
+    
+    public synchronized Optional<BirthdayData> getBirthdayData() {
+        return Optional.ofNullable(birthday_data);
+    }
+    
+    public synchronized void setBirthdayData(BirthdayData birthday_data) {
+        this.birthday_data = birthday_data;
+    }
+    
     
     @Override
     public boolean equals(Object o) {
