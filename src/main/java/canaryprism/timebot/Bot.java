@@ -303,9 +303,9 @@ public class Bot {
             
             String time;
             if (timezone_visible) {
-                time = now.atZone(timezone).format(formatter);
+                time = formatter.format(now.atZone(timezone));
             } else {
-                time = now.atZone(timezone).toLocalTime().format(formatter);
+                time = formatter.format(now.atZone(timezone).toLocalTime());
             }
             
             var message = String.format("The current time for %s is %s",
