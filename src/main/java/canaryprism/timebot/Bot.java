@@ -11,7 +11,7 @@ import canaryprism.slavacord.autocomplete.annotations.Autocompleter;
 import canaryprism.slavacord.autocomplete.annotations.Autocompletes;
 import canaryprism.slavacord.autocomplete.annotations.SearchSuggestions;
 import canaryprism.slavacord.autocomplete.filteroptions.MatchStart;
-import canaryprism.timebot.data.BirthdayData;
+import canaryprism.timebot.data.timers.BirthdayData;
 import canaryprism.timebot.data.BotData;
 import canaryprism.timebot.data.ServerData;
 import canaryprism.timebot.data.UserData;

@@ -1,11 +1,14 @@
 package canaryprism.timebot.data;
 
+import canaryprism.timebot.data.timers.BirthdayData;
+import canaryprism.timebot.data.timers.TimerData;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.user.User;
 import org.json.JSONObject;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -65,6 +68,16 @@ public class UserData {
         return json;
     }
     
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof UserData other && Objects.equals(this.user, other.user);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(user);
+    }
+    
     public User getUser() {
         return this.user;
     }
@@ -115,14 +128,4 @@ public class UserData {
         this.birthday_data = birthday_data;
     }
     
-    
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof UserData other && Objects.equals(this.user, other.user);
-    }
-    
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(user);
-    }
 }

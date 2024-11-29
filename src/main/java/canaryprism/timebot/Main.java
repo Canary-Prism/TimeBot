@@ -1,10 +1,9 @@
 package canaryprism.timebot;
 
 import dev.dirs.ProjectDirectories;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.intent.Intent;
+import org.javacord.api.interaction.SlashCommand;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -56,6 +55,7 @@ public class Main implements Runnable {
         @Override
         public void run() {
             try {
+
                 System.out.println("setting and writing token to file...");
                 
                 var config_path = Path.of(DIRS.configDir);
