@@ -160,6 +160,8 @@ public class Bot {
             
             birthday.birthdayNotified();
             this.update();
+            
+            saveAsync();
         }
         
         @Override
@@ -258,6 +260,8 @@ public class Bot {
             user.removeTimer(data);
             
             this.update();
+            
+            saveAsync();
         }
         
         @Override
