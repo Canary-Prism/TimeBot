@@ -22,7 +22,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.channel.RegularServerChannel;
-import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.channel.TextableRegularServerChannel;
 import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.message.mention.AllowedMentions;
@@ -986,7 +985,6 @@ public class Bot {
                     @Option(name = "hours") Optional<Long> opt_hours,
                     @Option(name = "minutes") Optional<Long> opt_minutes,
                     @Option(name = "seconds") Optional<Long> opt_seconds,
-                    @Option(name = "channel", description = "the channel to send the timer message in (default: this channel)") Optional<ServerChannel> opt_channel,
                     @Option(name = "message", description = "custom message to send when time is up (optional)") Optional<String> opt_message
             ) {
                 var server = interaction.getServer().orElseThrow();
@@ -1006,15 +1004,9 @@ public class Bot {
                 if (duration.isNegative())
                     return "Time specified is negative";
                 
-                if (opt_channel.isPresent() && opt_channel.flatMap(ServerChannel::asTextChannel).isEmpty())
-                    return String.format("Channel <#%s> is not a text channel", opt_channel.get().getIdAsString());
-                
-                var channel = opt_channel.flatMap(ServerChannel::asTextChannel)
-                        .orElse(interaction.getChannel().orElseThrow());
-                
                 var timer = new TimerData(
                         duration,
-                        channel,
+                        interaction.getChannel().orElseThrow(),
                         opt_message.orElse(String.format("Timer for %s ended", formatDuration(duration)))
                 );
                 
