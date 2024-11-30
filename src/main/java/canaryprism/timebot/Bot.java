@@ -11,15 +11,18 @@ import canaryprism.slavacord.autocomplete.annotations.Autocompleter;
 import canaryprism.slavacord.autocomplete.annotations.Autocompletes;
 import canaryprism.slavacord.autocomplete.annotations.SearchSuggestions;
 import canaryprism.slavacord.autocomplete.filteroptions.MatchStart;
-import canaryprism.timebot.data.timers.BirthdayData;
+import canaryprism.timebot.data.BirthdayData;
 import canaryprism.timebot.data.BotData;
 import canaryprism.timebot.data.ServerData;
 import canaryprism.timebot.data.UserData;
+import canaryprism.timebot.data.timers.TimerData;
 import org.apache.commons.lang3.LocaleUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.channel.RegularServerChannel;
+import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.channel.TextableRegularServerChannel;
 import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.message.mention.AllowedMentions;
@@ -119,23 +122,32 @@ public class Bot {
         logger.info("Bot started normally");
     }
     
-    class BirthdayTask extends TimerTask {
+    abstract class AbstractTimerTask extends TimerTask {
+        protected final Instant target_time;
         
-        private final UserData data;
-        
-        private final Instant target_time;
-        
-        BirthdayTask(UserData data) {
-            this.data = data;
-            this.target_time = data.getBirthdayData().orElseThrow().getNextBirthday();
+        AbstractTimerTask(Instant target_time) {
+            this.target_time = target_time;
         }
         
-        public void schedule() {
+        public synchronized final void schedule() {
             timer.schedule(this, Date.from(target_time));
         }
         
+        public abstract void update();
+        
+    }
+    
+    class BirthdayTask extends AbstractTimerTask {
+        
+        private final UserData data;
+        
+        BirthdayTask(UserData data) {
+            super(data.getBirthdayData().orElseThrow().getNextBirthday());
+            this.data = data;
+        }
+        
         @Override
-        public void run() {
+        public synchronized void run() {
             var birthday = data.getBirthdayData().orElseThrow();
             
             var channel = birthday.getChannel();
@@ -150,6 +162,7 @@ public class Bot {
             this.update();
         }
         
+        @Override
         public synchronized void update() {
             logger.info("updating timer for user {}", data.getUser());
             synchronized (data) {
@@ -208,7 +221,7 @@ public class Bot {
                 .forEach((e) -> {
                     var task = new BirthdayTask(e);
                     
-                    logger.info("new timer for user {}", e.getUser());
+                    logger.info("new birthday timer for user {}", e.getUser());
                     
                     synchronized (birthday_tasks) {
                         birthday_tasks.add(task);
@@ -219,6 +232,87 @@ public class Bot {
         
         synchronized (birthday_tasks) {
             for (var e : birthday_tasks)
+                e.update();
+        }
+    }
+    
+    class TimerTimerTask extends AbstractTimerTask {
+        
+        private final UserData user;
+        private final TimerData data;
+        
+        TimerTimerTask(UserData user, TimerData data) {
+            super(data.getTargetTime());
+            
+            this.user = user;
+            this.data = data;
+        }
+        
+        @Override
+        public void run() {
+            if (!user.hasTimer(data))
+                throw new IllegalStateException("User doesn't have this timer anymore without updating");
+            
+            data.getChannel().sendMessage(data.getMessage()).join();
+            
+            user.removeTimer(data);
+            
+            this.update();
+        }
+        
+        @Override
+        public void update() {
+            if (!user.hasTimer(data)) {
+                logger.info("timer timer cancelled, user dosn't have timer");
+                
+                this.cancel();
+                
+                synchronized (timer_timer_tasks) {
+                    timer_timer_tasks.remove(this);
+                }
+            }
+        }
+    }
+    
+    private final Set<TimerTimerTask> timer_timer_tasks = new HashSet<>();
+    
+    private void refreshTimersAsync() {
+        Thread.ofVirtual().start(this::refreshTimers);
+    }
+    
+    private void refreshTimers() {
+        logger.info("refreshing timers");
+        
+        Set<TimerData> timers;
+        synchronized (timer_timer_tasks) {
+            timers = timer_timer_tasks.stream()
+                    .map((e) -> e.data)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+        
+        bot_data.getServers()
+                .stream()
+                .flatMap((e) -> e.getUsers().stream())
+                .forEach((user) -> {
+                    user.getTimers()
+                            .stream()
+                            .filter((e) -> !timers.contains(e))
+                            .forEach((timer) -> {
+                                var task = new TimerTimerTask(user, timer);
+                                
+                                logger.info("new timer timer for user {}", user.getUser());
+                                
+                                synchronized (timer_timer_tasks) {
+                                    timer_timer_tasks.add(task);
+                                }
+                                
+                                task.schedule();
+                                
+                            });
+                });
+        
+        synchronized (timer_timer_tasks) {
+            for (var e : timer_timer_tasks)
                 e.update();
         }
     }
@@ -248,6 +342,13 @@ public class Bot {
     
     public static Locale convertLocale(DiscordLocale locale) {
         return Locale.forLanguageTag(locale.getLocaleCode());
+    }
+    
+    public static String formatDuration(Duration duration) {
+        return DurationFormatUtils.formatDuration(
+                duration.toMillis(),
+                "[d' Days '][H 'Hours'] m 'Minutes' s 'Seconds'"
+        );
     }
     
     @CreateGlobal
@@ -834,6 +935,121 @@ public class Bot {
                 return "Removed birthday data";
             }
         
+        }
+        
+        @CommandGroup(name = "timer", enabledInDMs = false)
+        class Timer {
+            @Command(name = "list", description = "list your current active timers")
+            @ReturnsResponse(ephemeral = true)
+            String list(@Interaction SlashCommandInteraction interaction) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                
+                var timers = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .map(UserData::getTimers)
+                        .orElse(List.of());
+                
+                if (timers.isEmpty()) {
+                    return "You have no active timers";
+                }
+                
+                var now = Instant.now();
+                
+                var sb = new StringBuilder();
+                
+                sb.append("List of current timers:");
+                
+                for (int i = 0; i < timers.size(); i++) {
+                    var e = timers.get(i);
+                    sb.append('\n')
+                            .append(i + 1)
+                            .append(": for ")
+                            .append(formatDuration(e.getDuration()))
+                            .append(" with ")
+                            .append(formatDuration(Duration.between(now, e.getTargetTime())))
+                            .append(" left");
+                }
+                
+                return sb.toString();
+            }
+            
+            @Command(name = "new", description = "add a new timer")
+            @ReturnsResponse(ephemeral = true)
+            String $new(
+                    @Interaction SlashCommandInteraction interaction,
+                    @Option(name = "days") Optional<Long> opt_days,
+                    @Option(name = "hours") Optional<Long> opt_hours,
+                    @Option(name = "minutes") Optional<Long> opt_minutes,
+                    @Option(name = "seconds") Optional<Long> opt_seconds,
+                    @Option(name = "channel", description = "the channel to send the timer message in (default: this channel)") Optional<ServerChannel> opt_channel,
+                    @Option(name = "message", description = "custom message to send when time is up (optional)") Optional<String> opt_message
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                
+                long
+                        days = opt_days.orElse(0L),
+                        hours = opt_hours.orElse(0L),
+                        minutes = opt_minutes.orElse(0L),
+                        seconds = opt_seconds.orElse(0L);
+                
+                var duration = Duration.ofDays(days)
+                        .plusHours(hours)
+                        .plusMinutes(minutes)
+                        .plusSeconds(seconds);
+                
+                
+                if (duration.isNegative())
+                    return "Time specified is negative";
+                
+                if (opt_channel.isPresent() && opt_channel.flatMap(ServerChannel::asTextChannel).isEmpty())
+                    return String.format("Channel <#%s> is not a text channel", opt_channel.get().getIdAsString());
+                
+                var channel = opt_channel.flatMap(ServerChannel::asTextChannel)
+                        .orElse(interaction.getChannel().orElseThrow());
+                
+                var timer = new TimerData(
+                        duration,
+                        channel,
+                        opt_message.orElse(String.format("Timer for %s ended", formatDuration(duration)))
+                );
+                
+                bot_data.obtainServerData(server)
+                        .obtainUserData(interaction.getUser())
+                        .addTimer(timer);
+                
+                refreshTimersAsync();
+                
+                saveAsync();
+                
+                return String.format("Added timer for %s", formatDuration(duration));
+            }
+            
+            @Command(name = "cancel", description = "cancel a timer")
+            @ReturnsResponse(ephemeral = true)
+            String cancel(
+                    @Interaction SlashCommandInteraction interaction,
+                    @LongBounds(min = 0) @Option(name = "index", description = "the index of the timer to cancel") Long index
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                var opt_user = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(interaction.getUser()));
+                var opt_timer = opt_user.flatMap((e) -> e.getTimer(index.intValue()));
+                
+                if (opt_timer.isEmpty())
+                    return "Timer with that index does not exist";
+                
+                var user = opt_user.get();
+                var timer = opt_timer.get();
+                
+                user.removeTimer(timer);
+                
+                refreshTimersAsync();
+                
+                saveAsync();
+                
+                return String.format("Timer for %s cancelled", formatDuration(timer.getDuration()));
+            }
         }
         
     }

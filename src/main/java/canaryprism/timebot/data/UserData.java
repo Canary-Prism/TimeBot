@@ -1,17 +1,14 @@
 package canaryprism.timebot.data;
 
-import canaryprism.timebot.data.timers.BirthdayData;
 import canaryprism.timebot.data.timers.TimerData;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.user.User;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 public class UserData {
     private final User user;
@@ -24,6 +21,8 @@ public class UserData {
     private volatile Boolean timezone_visible;
     
     private volatile BirthdayData birthday_data;
+    
+    private final ArrayList<TimerData> timers = new ArrayList<>();
     
     public UserData(User user) {
         this.user = Objects.requireNonNull(user, "user cannot be null");
@@ -48,6 +47,11 @@ public class UserData {
         this.birthday_data = Optional.ofNullable(json.optJSONObject("birthday"))
                 .map((e) -> new BirthdayData(e, api))
                 .orElse(null);
+        
+        for (var e : json.optJSONArray("timers", new JSONArray())) {
+            var timer = new TimerData((JSONObject) e, api);
+            timers.add(timer);
+        }
     }
     
     public synchronized JSONObject toJSON() {
@@ -64,6 +68,8 @@ public class UserData {
         isTimezoneVisible().ifPresent((state) -> json.put("timezone_visible", state));
         
         getBirthdayData().ifPresent((birthday) -> json.put("birthday", birthday.toJSON()));
+        
+        json.put("timers", timers.stream().map(TimerData::toJSON).toList());
         
         return json;
     }
@@ -126,6 +132,38 @@ public class UserData {
     
     public synchronized void setBirthdayData(BirthdayData birthday_data) {
         this.birthday_data = birthday_data;
+    }
+    
+    public List<TimerData> getTimers() {
+        synchronized (timers) {
+            return List.copyOf(timers);
+        }
+    }
+    
+    public Optional<TimerData> getTimer(int index) {
+        synchronized (timers) {
+            if (index >= 0 && index < timers.size())
+                return Optional.of(timers.get(index));
+            return Optional.empty();
+        }
+    }
+    
+    public void addTimer(TimerData data) {
+        synchronized (timers) {
+            timers.add(Objects.requireNonNull(data, "timer data can't be null"));
+        }
+    }
+    
+    public void removeTimer(TimerData data) {
+        synchronized (timers) {
+            timers.remove(Objects.requireNonNull(data, "timer data can't be null"));
+        }
+    }
+    
+    public boolean hasTimer(TimerData data) {
+        synchronized (timers) {
+            return timers.contains(Objects.requireNonNull(data, "timer data can't be null"));
+        }
     }
     
 }
