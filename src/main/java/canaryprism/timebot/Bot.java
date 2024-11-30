@@ -966,7 +966,7 @@ public class Bot {
                 for (int i = 0; i < timers.size(); i++) {
                     var e = timers.get(i);
                     sb.append('\n')
-                            .append(i + 1)
+                            .append(i)
                             .append(": for ")
                             .append(formatDuration(e.getDuration()))
                             .append(" with ")
