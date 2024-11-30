@@ -1,4 +1,4 @@
-package canaryprism.timebot.data.timers;
+package canaryprism.timebot.data;
 
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.channel.TextableRegularServerChannel;
