@@ -351,7 +351,7 @@ public class Bot {
     public static String formatDuration(Duration duration) {
         return DurationFormatUtils.formatDuration(
                 duration.toMillis(),
-                "[d' Days '][H 'Hours'] m 'Minutes' s 'Seconds'"
+                "[d' Days '][H' Hours ']m 'Minutes' s 'Seconds'"
         );
     }
     
