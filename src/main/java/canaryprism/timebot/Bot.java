@@ -1007,7 +1007,8 @@ public class Bot {
                 var timer = new TimerData(
                         duration,
                         interaction.getChannel().orElseThrow(),
-                        opt_message.orElse(String.format("Timer for %s ended", formatDuration(duration)))
+                        opt_message.orElse(String.format("Timer for %s ended %s",
+                                formatDuration(duration), interaction.getUser().getMentionTag()))
                 );
                 
                 bot_data.obtainServerData(server)
