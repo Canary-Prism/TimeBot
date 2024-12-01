@@ -91,10 +91,10 @@ public class Bot {
     
     public void save() {
         try {
-            logger.info("saving...");
+            logger.debug("saving...");
             Files.writeString(save_file, bot_data.toJSON().toString(),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            logger.info("saved");
+            logger.debug("saved");
         } catch (IOException e) {
             logger.error("failed to save data: ", e);
             logger.error("""
@@ -165,12 +165,12 @@ public class Bot {
         
         @Override
         public synchronized void update() {
-            logger.info("updating timer for user {}", data.getUser());
+            logger.trace("updating timer for user {}", data.getUser());
             synchronized (data) {
                 if (!data.getBirthdayData().map(BirthdayData::getNextBirthday).map(target_time::equals).orElse(false)) {
                     var opt_birthday = data.getBirthdayData();
                     if (opt_birthday.isPresent()) {
-                        logger.info("time changed, rescheduling to {}...",
+                        logger.trace("time changed, rescheduling to {}...",
                                 () -> data.getBirthdayData().map(BirthdayData::getNextBirthday));
                         
                         this.cancel();
@@ -184,7 +184,7 @@ public class Bot {
                         
                         new_task.schedule();
                     } else {
-                        logger.info("birthday removed, cancelling task");
+                        logger.trace("birthday removed, cancelling task");
                         
                         this.cancel();
                         
@@ -205,7 +205,7 @@ public class Bot {
     }
     
     private void refreshBirthdayTimers() {
-        logger.info("refreshing birthday timers");
+        logger.debug("refreshing birthday timers");
         
         Set<UserData> birthday_users;
         synchronized (birthday_tasks) {
@@ -222,7 +222,7 @@ public class Bot {
                 .forEach((e) -> {
                     var task = new BirthdayTask(e);
                     
-                    logger.info("new birthday timer for user {}", e.getUser());
+                    logger.debug("new birthday timer for user {}", e.getUser());
                     
                     synchronized (birthday_tasks) {
                         birthday_tasks.add(task);
@@ -266,7 +266,7 @@ public class Bot {
         @Override
         public void update() {
             if (!user.hasTimer(data)) {
-                logger.info("timer timer cancelled, user dosn't have timer");
+                logger.trace("timer timer cancelled, user dosn't have timer");
                 
                 this.cancel();
                 
@@ -284,7 +284,7 @@ public class Bot {
     }
     
     private void refreshTimers() {
-        logger.info("refreshing timers");
+        logger.debug("refreshing timers");
         
         Set<TimerData> timers;
         synchronized (timer_timer_tasks) {
@@ -303,7 +303,7 @@ public class Bot {
                             .forEach((timer) -> {
                                 var task = new TimerTimerTask(user, timer);
                                 
-                                logger.info("new timer timer for user {}", user.getUser());
+                                logger.debug("new timer timer for user {}", user.getUser());
                                 
                                 synchronized (timer_timer_tasks) {
                                     timer_timer_tasks.add(task);
@@ -359,6 +359,7 @@ public class Bot {
         @Command(name = "ping", description = "Pong !")
         @ReturnsResponse(ephemeral = true)
         String ping() {
+            logger.trace("/ping command");
             return "Pong !";
         }
         
@@ -378,6 +379,8 @@ public class Bot {
             var user = opt_user.orElse(interaction.getUser());
             
             var server = interaction.getServer().orElseThrow();
+            
+            logger.trace("/time command; user: {}, server: {}, target: {}", interaction.getUser(), server, user);
             
             var opt_timezone = bot_data.getServerData(server)
                     .flatMap((e) -> e.getUserData(user))
@@ -445,6 +448,8 @@ public class Bot {
             ) {
                 var server = interaction.getServer().orElseThrow();
                 
+                logger.trace("/timezone set command; user: {}, server: {}, timezone_query: {}", interaction.getUser(), server, timezone_query);
+                
                 try {
                     var timezone = ZoneId.of(timezone_query);
                     
@@ -466,6 +471,7 @@ public class Bot {
             @SearchSuggestions(at = MatchStart.ANYWHERE, ignorePunctuation = true)
             @Autocompleter
             List<AutocompleteSuggestion<String>> getTimezones(String input) {
+                logger.trace("timezone autocomplete for input '{}'", input);
                 var list = new ArrayList<AutocompleteSuggestion<String>>();
                 
                 if (!input.isBlank()) {
@@ -513,6 +519,8 @@ public class Bot {
                 var server = interaction.getServer().orElseThrow();
                 var user = interaction.getUser();
                 
+                logger.trace("/timezone setvisible command; user: {}, server: {}", user, server);
+                
                 try {
 
                     var current_state = bot_data.getServerData(server)
@@ -544,6 +552,8 @@ public class Bot {
                 var server = interaction.getServer().orElseThrow();
                 var user = interaction.getUser();
                 
+                logger.trace("/timezone remove command; user: {}, server: {}", user, server);
+                
                 var data = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(user));
                 
@@ -566,6 +576,9 @@ public class Bot {
                 @Option(name = "pattern", description = "the pattern to set to, if not present resets it to default") Optional<String> opt_pattern
         ) {
             var server = interaction.getServer().orElseThrow();
+            
+            logger.trace("/time command; user: {}, server: {}, pattern: {}", interaction.getUser(), server, opt_pattern);
+            
             if (opt_pattern.isPresent()) {
                 var pattern = opt_pattern.get();
                 try {
@@ -620,6 +633,8 @@ public class Bot {
                 @Option(name = "language_tag", description = "the pattern to set to, if not present resets it to default") Optional<String> opt_language_tag
         ) {
             var server = interaction.getServer().orElseThrow();
+            logger.trace("/setlocale command; user: {}, server: {}", interaction.getUser(), server);
+            
             if (opt_language_tag.isPresent()) {
                 
                 var language_tag = opt_language_tag.get();
@@ -662,6 +677,7 @@ public class Bot {
         @SearchSuggestions(at = MatchStart.ANYWHERE, ignorePunctuation = true)
         @Autocompleter
         List<AutocompleteSuggestion<String>> getLocales(String input) {
+            logger.trace("autocompleting locale for input '{}'", input);
             var list = new ArrayList<AutocompleteSuggestion<String>>();
             
             if (!input.isBlank()) {
@@ -733,6 +749,8 @@ public class Bot {
                 ) {
                     var server = interaction.getServer().orElseThrow();
                     
+                    logger.trace("/moderation forcemessageflag set command; user: {}, server: {}, flag: {}", interaction.getUser(), server, opt_flag);
+                    
                     var data = bot_data.obtainServerData(server);
                     
                     data.forceMessageFlag(opt_flag.map(ResponderFlags::getMessageFlag).orElse(null));
@@ -748,6 +766,7 @@ public class Bot {
                 @ReturnsResponse(ephemeral = true)
                 String get(@Interaction SlashCommandInteraction interaction) {
                     var server = interaction.getServer().orElseThrow();
+                    logger.trace("/moderation forcemessageflag get command; user: {}, server: {}", interaction.getUser(), server);
                     
                     return bot_data.getServerData(server)
                             .flatMap(ServerData::getForcedMessageFlag)
@@ -766,6 +785,7 @@ public class Bot {
                         @Option(name = "channel", description = "the channel to allow") RegularServerChannel channel
                 ) {
                     var server = interaction.getServer().orElseThrow();
+                    logger.trace("/moderation birthdaychannel add command; user: {}, server: {}, channel: {}", interaction.getUser(), server, channel);
                     
                     if (!(channel instanceof TextableRegularServerChannel text_channel))
                         return "Not a textable channel";
@@ -793,6 +813,7 @@ public class Bot {
                         @Option(name = "fallback_channel", description = "the channel to set birthdays targeting target_channel to change to") RegularServerChannel fallback_channel
                 ) {
                     var server = interaction.getServer().orElseThrow();
+                    logger.trace("/moderation birthdaychannel remove command; user: {}, server: {}, target_channel: {}, fallback_channel: {}", interaction.getUser(), server, target_channel, fallback_channel);
                     
                     if (!(target_channel instanceof TextableRegularServerChannel target_text_channel))
                         return String.format("<#%s> not a textable channel", target_channel.getIdAsString());
@@ -849,6 +870,7 @@ public class Bot {
                     @Option(name = "year", description = "birth year (to track age, optional)") Optional<Long> long_year
             ) {
                 var server = interaction.getServer().orElseThrow();
+                logger.trace("/birthday set command; user: {}, server: {}", interaction.getUser(), server);
                 
                 if (!(channel instanceof TextableRegularServerChannel text_channel))
                     return String.format("<#%s> not a textable channel", channel.getIdAsString());
@@ -922,6 +944,7 @@ public class Bot {
             String remove(@Interaction SlashCommandInteraction interaction) {
                 var server = interaction.getServer().orElseThrow();
                 var user = interaction.getUser();
+                logger.trace("/birthday remove command; user: {}, server: {}", user, server);
                 
                 var data = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(user));
@@ -947,6 +970,7 @@ public class Bot {
             String list(@Interaction SlashCommandInteraction interaction) {
                 var server = interaction.getServer().orElseThrow();
                 var user = interaction.getUser();
+                logger.trace("/timer list command; user: {}, server: {}", user, server);
                 
                 var timers = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(user))
@@ -988,6 +1012,7 @@ public class Bot {
                     @Option(name = "message", description = "custom message to send when time is up (optional)") Optional<String> opt_message
             ) {
                 var server = interaction.getServer().orElseThrow();
+                logger.trace("/timer new command; user: {}, server: {}", interaction.getUser(), server);
                 
                 long
                         days = opt_days.orElse(0L),
@@ -1029,6 +1054,8 @@ public class Bot {
                     @LongBounds(min = 0) @Option(name = "index", description = "the index of the timer to cancel") Long index
             ) {
                 var server = interaction.getServer().orElseThrow();
+                logger.trace("/timer cancel command; user: {}, server: {}, index: {}", interaction.getUser(), server, index);
+                
                 var opt_user = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(interaction.getUser()));
                 var opt_timer = opt_user.flatMap((e) -> e.getTimer(index.intValue()));

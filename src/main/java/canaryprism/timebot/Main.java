@@ -3,7 +3,6 @@ package canaryprism.timebot;
 import dev.dirs.ProjectDirectories;
 import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.intent.Intent;
-import org.javacord.api.interaction.SlashCommand;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -18,6 +17,9 @@ import java.util.NoSuchElementException;
 public class Main implements Runnable {
     
     private static final ProjectDirectories DIRS = ProjectDirectories.from("", "canaryprism", "TimeBot");
+    static {
+        System.setProperty("canaryprism.timebot.logdir", Path.of(DIRS.dataDir, "logs").toString());
+    }
     
     
     @Override
