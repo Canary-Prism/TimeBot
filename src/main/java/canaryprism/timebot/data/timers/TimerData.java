@@ -11,38 +11,31 @@ public class TimerData extends AbstractTimerData {
     
     protected final Duration duration;
     
-    protected final TextChannel channel;
-    
-    protected final String message;
-    
     public TimerData(Duration duration, TextChannel channel, String message) {
-        super(Instant.now().plus(duration));
+        super(Instant.now().plus(duration), channel, message);
         
         this.duration = duration;
-        this.channel = channel;
-        this.message = message;
     }
     
     public TimerData(JSONObject json, DiscordApi api) {
-        super(json);
+        super(json, api);
         
         this.duration = Duration.parse(json.getString("duration"));
-        
-        this.channel = api.getTextChannelById(json.getLong("channel")).orElseThrow();
-        
-        this.message = json.getString("message");
     }
     
     @Override
     public JSONObject toJSON() {
         return super.toJSON()
-                .put("duration", duration.toString())
-                .put("channel", channel.getId())
-                .put("message", message);
+                .put("duration", duration.toString());
     }
     
     @Override
-    public synchronized void setTargetTime(Instant target) {
+    public Instant getTargetTime() {
+        return target;
+    }
+    
+    @Override
+    public void setTargetTime(Instant target) {
         throw new UnsupportedOperationException("can't manually set target time on TimerData");
     }
     
@@ -50,11 +43,23 @@ public class TimerData extends AbstractTimerData {
         return duration;
     }
     
+    @Override
     public TextChannel getChannel() {
         return channel;
     }
     
+    @Override
+    public void setChannel(TextChannel channel) {
+        throw new UnsupportedOperationException("can't change channel on TimerData");
+    }
+    
+    @Override
     public String getMessage() {
         return message;
+    }
+    
+    @Override
+    public void setMessage(String message) {
+        throw new UnsupportedOperationException("can't change message on TimerData");
     }
 }
