@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.FormatStyle;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class Bot {
@@ -348,10 +349,21 @@ public class Bot {
     }
     
     public static String formatDuration(Duration duration) {
-        return DurationFormatUtils.formatDuration(
-                duration.toMillis(),
-                "[d' Days '][H' Hours ']m 'Minutes' s 'Seconds'"
-        );
+        class Regexes {
+            static final Pattern PLURAL_DAYS = Pattern.compile("\\b1 days\\b");
+            static final Pattern PLURAL_HOURS = Pattern.compile("\\b1 hours\\b");
+            static final Pattern PLURAL_MINUTES = Pattern.compile("\\b1 minutes\\b");
+            static final Pattern PLURAL_SECONDS = Pattern.compile("\\b1 seconds\\b");
+        }
+        var str = DurationFormatUtils.formatDuration(duration.toMillis(),
+                "[d 'days' ][H 'hours' ]m 'minutes' s 'seconds'");
+        
+        str = Regexes.PLURAL_DAYS.matcher(str).replaceAll("1 day");
+        str = Regexes.PLURAL_HOURS.matcher(str).replaceAll("1 hour");
+        str = Regexes.PLURAL_MINUTES.matcher(str).replaceAll("1 minute");
+        str = Regexes.PLURAL_SECONDS.matcher(str).replaceAll("1 second");
+        
+        return str;
     }
     
     @CreateGlobal
