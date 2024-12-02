@@ -630,6 +630,20 @@ public class Bot {
                 
                 return list;
             }
+
+            @Command(name = "get", description = "get your current set timezone")
+            @ReturnsResponse(ephemeral = true)
+            String get(@Interaction SlashCommandInteraction interaction) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                logger.trace("/timezone get command; user: {}, server: {}", user, server);
+
+                return bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .flatMap(UserData::getTimezone)
+                        .map((e) -> String.format("Your current set timezone is %s", e))
+                        .orElse("You don't have a timezone set");
+            }
             
             @Command(name = "setvisible", description = "set whether your timezone is visible to others")
             @ReturnsResponse(ephemeral = true)
