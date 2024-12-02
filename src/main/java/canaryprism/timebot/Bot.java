@@ -511,7 +511,7 @@ public class Bot {
                     .flatMap(UserData::getTimezone);
             
             if (opt_timezone.isEmpty())
-                return String.format("User %s has no timezone set!", user.getMentionTag());
+                return String.format("User %s has no timezone set! Set a timezone with `/timezone set`", user.getMentionTag());
             
             var timezone = opt_timezone.get();
             
@@ -1004,7 +1004,10 @@ public class Bot {
                 
                 if (!allowed_channels.map((e) -> e.contains(channel)).orElse(false)) {
                     if (allowed_channels.map(Set::isEmpty).orElse(true))
-                        return "This server doesn't allow any birthday notifications";
+                        return """
+                                This server doesn't allow any birthday notifications
+                                if you're a moderator you can add one with `/moderation birthdaychannel add`
+                                """;
                     else
                         return String.format("""
                                 %s is not in the allowed birthday notification channels
