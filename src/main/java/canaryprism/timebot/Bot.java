@@ -841,7 +841,7 @@ public class Bot {
             list.addAll(Locale.availableLocales()
                     .filter((e) -> !LocaleUtils.isLanguageUndetermined(e))
                     .map((e) -> AutocompleteSuggestion.of(
-                            String.format("%s (%s)", e.toString(), e.toLanguageTag()),
+                            String.format("%s (%s)", e, e.toLanguageTag()),
                             e.toLanguageTag()
                     ))
                     .toList());
@@ -1245,8 +1245,6 @@ public class Bot {
                 if (alarms.isEmpty()) {
                     return "You have no active alarms";
                 }
-                
-                var now = Instant.now();
                 
                 var sb = new StringBuilder();
                 
