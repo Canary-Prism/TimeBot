@@ -15,6 +15,7 @@ import canaryprism.timebot.data.BirthdayData;
 import canaryprism.timebot.data.BotData;
 import canaryprism.timebot.data.ServerData;
 import canaryprism.timebot.data.UserData;
+import canaryprism.timebot.data.timers.AlarmData;
 import canaryprism.timebot.data.timers.TimerData;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -240,24 +241,22 @@ public class Bot {
     
     class TimerTimerTask extends AbstractTimerTask {
         
-        private final UserData user;
         private final TimerData data;
         
-        TimerTimerTask(UserData user, TimerData data) {
+        TimerTimerTask(TimerData data) {
             super(data.getTargetTime());
             
-            this.user = user;
             this.data = data;
         }
         
         @Override
         public void run() {
-            if (!user.hasTimer(data))
+            if (!data.isActive())
                 throw new IllegalStateException("User doesn't have this timer anymore without updating");
             
             data.getChannel().sendMessage(data.getMessage()).join();
             
-            user.removeTimer(data);
+            data.complete();
             
             this.update();
             
@@ -266,7 +265,7 @@ public class Bot {
         
         @Override
         public void update() {
-            if (!user.hasTimer(data)) {
+            if (!data.isActive()) {
                 logger.trace("timer timer cancelled, user dosn't have timer");
                 
                 this.cancel();
@@ -297,26 +296,114 @@ public class Bot {
         bot_data.getServers()
                 .stream()
                 .flatMap((e) -> e.getUsers().stream())
-                .forEach((user) -> {
-                    user.getTimers()
-                            .stream()
-                            .filter((e) -> !timers.contains(e))
-                            .forEach((timer) -> {
-                                var task = new TimerTimerTask(user, timer);
-                                
-                                logger.debug("new timer timer for user {}", user.getUser());
-                                
-                                synchronized (timer_timer_tasks) {
-                                    timer_timer_tasks.add(task);
-                                }
-                                
-                                task.schedule();
-                                
-                            });
+                .flatMap((e) -> e.getTimers().stream())
+                .filter((e) -> !timers.contains(e))
+                .forEach((timer) -> {
+                    var task = new TimerTimerTask(timer);
+                    
+                    logger.debug("new timer timer for user {}", timer.getOwner());
+                    
+                    synchronized (timer_timer_tasks) {
+                        timer_timer_tasks.add(task);
+                    }
+                    
+                    task.schedule();
+                    
                 });
         
         synchronized (timer_timer_tasks) {
             for (var e : timer_timer_tasks)
+                e.update();
+        }
+    }
+    
+    class AlarmTimerTask extends AbstractTimerTask {
+        
+        private final AlarmData data;
+        
+        AlarmTimerTask(AlarmData data) {
+            super(data.getTargetTime().orElseThrow());
+            
+            this.data = data;
+        }
+        
+        @Override
+        public void run() {
+            if (!data.isActive())
+                throw new IllegalStateException("User doesn't have this alarm anymore without updating");
+            
+            data.getChannel().sendMessage(data.getMessage()).join();
+            
+            data.complete();
+            
+            this.update();
+            
+            saveAsync();
+        }
+        
+        @Override
+        public void update() {
+            if (!data.isActive() || data.getTargetTime().isEmpty()) {
+                logger.trace("alarm cancelled, user dosn't have alarm");
+                
+                this.cancel();
+                
+                synchronized (alarm_tasks) {
+                    alarm_tasks.remove(this);
+                }
+            } else if (!data.getTargetTime().get().equals(target_time)) {
+                logger.trace("alarm changed, rescheduling");
+                
+                this.cancel();
+                
+                var new_task = new AlarmTimerTask(data);
+                
+                synchronized (alarm_tasks) {
+                    alarm_tasks.remove(this);
+                    alarm_tasks.add(new_task);
+                }
+                
+                new_task.schedule();
+            }
+        }
+    }
+    
+    private final Set<AlarmTimerTask> alarm_tasks = new HashSet<>();
+    
+    private void refreshAlarmsAsync() {
+        Thread.ofVirtual().start(this::refreshAlarms);
+    }
+    
+    private void refreshAlarms() {
+        logger.debug("refreshing alarms");
+        
+        Set<AlarmData> alarms;
+        synchronized (alarm_tasks) {
+            alarms = alarm_tasks.stream()
+                    .map((e) -> e.data)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+        
+        bot_data.getServers()
+                .stream()
+                .flatMap((e) -> e.getUsers().stream())
+                .flatMap((e) -> e.getAlarms().stream())
+                .filter((e) -> !alarms.contains(e))
+                .forEach((timer) -> {
+                    var task = new AlarmTimerTask(timer);
+                    
+                    logger.debug("new timer timer for user {}", timer.getOwner());
+                    
+                    synchronized (alarm_tasks) {
+                        alarm_tasks.add(task);
+                    }
+                    
+                    task.schedule();
+                    
+                });
+        
+        synchronized (alarm_tasks) {
+            for (var e : alarm_tasks)
                 e.update();
         }
     }
@@ -364,6 +451,31 @@ public class Bot {
         str = Regexes.PLURAL_SECONDS.matcher(str).replaceAll("1 second");
         
         return str;
+    }
+
+    enum DayOfWeekOption implements CustomChoiceName {
+        MONDAY("Monday", EnumSet.of(DayOfWeek.MONDAY)),
+        TUESDAY("Tuesday", EnumSet.of(DayOfWeek.TUESDAY)),
+        WEDNESDAY("Wednesday", EnumSet.of(DayOfWeek.WEDNESDAY)),
+        THURSDAY("Thursday", EnumSet.of(DayOfWeek.THURSDAY)),
+        FRIDAY("Friday", EnumSet.of(DayOfWeek.FRIDAY)),
+        SATURDAY("Saturday", EnumSet.of(DayOfWeek.SATURDAY)),
+        SUNDAY("Sunday", EnumSet.of(DayOfWeek.SUNDAY)),
+        EVERY_DAY("Everyday", EnumSet.allOf(DayOfWeek.class));
+
+
+        private final String choice_name;
+        private final Set<DayOfWeek> day_of_week_set;
+
+        DayOfWeekOption(String choice_name, EnumSet<DayOfWeek> day_of_week_set) {
+            this.choice_name = choice_name;
+            this.day_of_week_set = Collections.unmodifiableSet(day_of_week_set);
+        }
+
+        @Override
+        public String getCustomName() {
+            return choice_name;
+        }
     }
     
     @CreateGlobal
@@ -1041,16 +1153,19 @@ public class Bot {
                 if (duration.isNegative())
                     return "Time specified is negative";
                 
+                
+                var user = bot_data.obtainServerData(server)
+                        .obtainUserData(interaction.getUser());
+                
                 var timer = new TimerData(
+                        user,
                         duration,
                         interaction.getChannel().orElseThrow(),
                         opt_message.orElse(String.format("Timer for %s ended %s",
                                 formatDuration(duration), interaction.getUser().getMentionTag()))
                 );
                 
-                bot_data.obtainServerData(server)
-                        .obtainUserData(interaction.getUser())
-                        .addTimer(timer);
+                user.addTimer(timer);
                 
                 refreshTimersAsync();
                 
@@ -1088,5 +1203,222 @@ public class Bot {
             }
         }
         
+        
+        @CommandGroup(name = "alarm", enabledInDMs = false)
+        class Alarm {
+            @Command(name = "list", description = "list your current active alarms")
+            @ReturnsResponse(ephemeral = true)
+            String list(@Interaction SlashCommandInteraction interaction) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                logger.trace("/alarm list command; user: {}, server: {}", user, server);
+                
+                var alarms = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .map(UserData::getAlarms)
+                        .orElse(List.of());
+                
+                if (alarms.isEmpty()) {
+                    return "You have no active alarms";
+                }
+                
+                var now = Instant.now();
+                
+                var sb = new StringBuilder();
+                
+                sb.append("List of current alarms:");
+                
+                for (int i = 0; i < alarms.size(); i++) {
+                    var e = alarms.get(i);
+                    sb.append('\n')
+                            .append(i)
+                            .append(": at ")
+                            .append(e.getTime());
+                    
+                    var repeating = e.getRepeatingDays();
+                    
+                    if (!repeating.isEmpty())
+                        sb.append(" repeating ")
+                            .append(repeating);
+                }
+                
+                return sb.toString();
+            }
+            
+            @Command(name = "new", description = "make a new alarm")
+            @ReturnsResponse(ephemeral = true)
+            String $new(
+                    @Interaction SlashCommandInteraction interaction,
+                    
+                    @LongBounds(min = 0, max = 23)
+                    @Option(name = "hour") Long hour,
+                    
+                    @LongBounds(min = 0, max = 59)
+                    @Option(name = "minute") Long minute,
+                    
+                    @LongBounds(min = 0, max = 59)
+                    @Option(name = "second") Optional<Long> opt_seconds,
+                    
+                    @Option(name = "message", description = "custom message to send (optional)") Optional<String> opt_message
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                logger.trace("/alarm new command; user: {}, server: {}", interaction.getUser(), server);
+                
+                var opt_timezone = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(interaction.getUser()))
+                        .flatMap(UserData::getTimezone);
+                
+                if (opt_timezone.isEmpty())
+                    return "You don't have a timezone set! you can set one with `/timezone set`";
+                
+                var user = bot_data.obtainServerData(server)
+                        .obtainUserData(interaction.getUser());
+                
+                var time = LocalTime.of(hour.intValue(), minute.intValue(), opt_seconds.map(Long::intValue).orElse(0));
+                
+                var data = new AlarmData(
+                        user,
+                        time,
+                        interaction.getChannel().orElseThrow(),
+                        opt_message.orElse(String.format("Alarm for %s %s",
+                                time.toString(), interaction.getUser().getMentionTag()))
+                );
+                
+                user.addAlarm(data);
+                
+                refreshAlarmsAsync();
+                
+                saveAsync();
+                //TODO: fix please
+                return String.format("""
+                        Added new alarm for %s
+                        Alarms are nonrepeating by default, you can use `/alarm addrepeat` to add repeating days
+                        """, time);
+            }
+            
+            @Command(name = "modify", description = "modify an existing alarm")
+            @ReturnsResponse(ephemeral = true)
+            String modify(
+                    @Interaction SlashCommandInteraction interaction,
+                    
+                    @LongBounds(min = 0)
+                    @Option(name = "index") Long index,
+                    
+                    @LongBounds(min = 0, max = 23)
+                    @Option(name = "hour") Optional<Long> opt_hour,
+                    
+                    @LongBounds(min = 0, max = 59)
+                    @Option(name = "minute") Optional<Long> opt_minute,
+                    
+                    @LongBounds(min = 0, max = 59)
+                    @Option(name = "second") Optional<Long> opt_seconds,
+                    
+                    @Option(name = "message") Optional<String> opt_message
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                logger.trace("/alarm modify command; user: {}, server: {}", user, server);
+                
+                var opt_alarm = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .flatMap((e) -> e.getAlarm(index.intValue()));
+                
+                if (opt_alarm.isEmpty()) {
+                    return "Alarm of that index doesn't exist";
+                }
+                
+                var alarm = opt_alarm.get();
+                
+                var time = alarm.getTime();
+                
+                if (opt_hour.isPresent())
+                    time = time.withHour(opt_hour.get().intValue());
+                
+                if (opt_minute.isPresent())
+                    time = time.withMinute(opt_minute.get().intValue());
+                
+                if (opt_seconds.isPresent())
+                    time = time.withSecond(opt_seconds.get().intValue());
+                
+                alarm.setTime(time);
+                
+                opt_message.ifPresent(alarm::setMessage);
+
+                refreshAlarmsAsync();
+
+                saveAsync();
+                
+                return String.format("Modified alarm %s to be at %s with message '%s'",
+                        index, time, opt_message.orElse(alarm.getMessage()));
+            }
+            
+            @Command(name = "addrepeat", description = "add a day of week an alarm repeats on")
+            @ReturnsResponse(ephemeral = true)
+            String addrepeat(
+                    @Interaction SlashCommandInteraction interaction,
+                    @Option(name = "index") Long index,
+                    @Option(name = "day") DayOfWeekOption day_of_week_option
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                logger.trace("/alarm addrepeat command; user: {}, server: {}, day: {}", user, server, day_of_week_option);
+
+                var opt_alarm = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .flatMap((e) -> e.getAlarm(index.intValue()));
+
+                if (opt_alarm.isEmpty()) {
+                    return "Alarm of that index doesn't exist";
+                }
+
+                var alarm = opt_alarm.get();
+
+                var success = day_of_week_option.day_of_week_set
+                        .stream()
+                        .map(alarm::addRepeatingDay)
+                        .reduce(false, (a, b) -> a || b);
+
+                if (success)
+                    return String.format("Added %s to repeating days for alarm %s",
+                            day_of_week_option.getCustomName(), index);
+                else
+                    return String.format("Alarm %s already repeats %s",
+                            index, day_of_week_option.getCustomName());
+            }
+
+            @Command(name = "removerepeat", description = "remove a day of week an alarm repeats on")
+            @ReturnsResponse(ephemeral = true)
+            String removerepeat(
+                    @Interaction SlashCommandInteraction interaction,
+                    @Option(name = "index") Long index,
+                    @Option(name = "day") DayOfWeekOption day_of_week_option
+            ) {
+                var server = interaction.getServer().orElseThrow();
+                var user = interaction.getUser();
+                logger.trace("/alarm removerepeat command; user: {}, server: {}, day: {}", user, server, day_of_week_option);
+
+                var opt_alarm = bot_data.getServerData(server)
+                        .flatMap((e) -> e.getUserData(user))
+                        .flatMap((e) -> e.getAlarm(index.intValue()));
+
+                if (opt_alarm.isEmpty()) {
+                    return "Alarm of that index doesn't exist";
+                }
+
+                var alarm = opt_alarm.get();
+
+                var success = day_of_week_option.day_of_week_set
+                        .stream()
+                        .map(alarm::removeRepeatingDay)
+                        .reduce(false, (a, b) -> a || b);
+
+                if (success)
+                    return String.format("Removed %s from repeating days for alarm %s",
+                            day_of_week_option.getCustomName(), index);
+                else
+                    return String.format("Alarm %s already doesn't repeat %s",
+                            index, day_of_week_option.getCustomName());
+            }
+        }
     }
 }

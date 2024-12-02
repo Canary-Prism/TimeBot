@@ -1,13 +1,15 @@
 package canaryprism.timebot.data.timers;
 
+import canaryprism.timebot.data.UserData;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.channel.TextChannel;
 import org.json.JSONObject;
 
 import java.time.Instant;
-import java.util.Objects;
 
 public abstract class AbstractTimerData {
+    
+    protected final UserData owner;
     
     protected volatile Instant target;
     
@@ -15,13 +17,15 @@ public abstract class AbstractTimerData {
     
     protected volatile String message;
     
-    public AbstractTimerData(Instant target, TextChannel channel, String message) {
+    public AbstractTimerData(UserData owner, Instant target, TextChannel channel, String message) {
+        this.owner = owner;
         this.target = target;
         this.channel = channel;
         this.message = message;
     }
     
-    public AbstractTimerData(JSONObject json, DiscordApi api) {
+    public AbstractTimerData(JSONObject json, DiscordApi api, UserData owner) {
+        this.owner = owner;
         this.target = Instant.ofEpochMilli(json.getLong("target"));
         this.channel = api.getTextChannelById(json.getLong("channel")).orElseThrow();
         this.message = json.getString("message");
@@ -33,12 +37,8 @@ public abstract class AbstractTimerData {
                 .put("message", message);
     }
     
-    public synchronized Instant getTargetTime() {
-        return target;
-    }
-    
-    public synchronized void setTargetTime(Instant target) {
-        this.target = Objects.requireNonNull(target, "target time can't be null");
+    public UserData getOwner() {
+        return owner;
     }
     
     public synchronized TextChannel getChannel() {
@@ -56,4 +56,8 @@ public abstract class AbstractTimerData {
     public synchronized void setMessage(String message) {
         this.message = message;
     }
+    
+    public abstract boolean isActive();
+    
+    public abstract void complete();
 }

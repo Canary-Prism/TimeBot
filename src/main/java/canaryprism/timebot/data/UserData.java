@@ -1,5 +1,6 @@
 package canaryprism.timebot.data;
 
+import canaryprism.timebot.data.timers.AlarmData;
 import canaryprism.timebot.data.timers.TimerData;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.user.User;
@@ -23,6 +24,7 @@ public class UserData {
     private volatile BirthdayData birthday_data;
     
     private final ArrayList<TimerData> timers = new ArrayList<>();
+    private final ArrayList<AlarmData> alarms = new ArrayList<>();
     
     public UserData(User user) {
         this.user = Objects.requireNonNull(user, "user cannot be null");
@@ -49,8 +51,13 @@ public class UserData {
                 .orElse(null);
         
         for (var e : json.optJSONArray("timers", new JSONArray())) {
-            var timer = new TimerData((JSONObject) e, api);
+            var timer = new TimerData((JSONObject) e, api, this);
             timers.add(timer);
+        }
+        
+        for (var e : json.optJSONArray("alarms", new JSONArray())) {
+            var alarm = new AlarmData((JSONObject) e, api, this);
+            alarms.add(alarm);
         }
     }
     
@@ -70,6 +77,8 @@ public class UserData {
         getBirthdayData().ifPresent((birthday) -> json.put("birthday", birthday.toJSON()));
         
         json.put("timers", timers.stream().map(TimerData::toJSON).toList());
+        
+        json.put("alarms", alarms.stream().map(AlarmData::toJSON).toList());
         
         return json;
     }
@@ -163,6 +172,38 @@ public class UserData {
     public boolean hasTimer(TimerData data) {
         synchronized (timers) {
             return timers.contains(Objects.requireNonNull(data, "timer data can't be null"));
+        }
+    }
+    
+    public List<AlarmData> getAlarms() {
+        synchronized (alarms) {
+            return List.copyOf(alarms);
+        }
+    }
+    
+    public Optional<AlarmData> getAlarm(int index) {
+        synchronized (alarms) {
+            if (index >= 0 && index < alarms.size())
+                return Optional.of(alarms.get(index));
+            return Optional.empty();
+        }
+    }
+    
+    public void addAlarm(AlarmData data) {
+        synchronized (alarms) {
+            alarms.add(Objects.requireNonNull(data, "alarm data can't be null"));
+        }
+    }
+    
+    public void removeAlarm(AlarmData data) {
+        synchronized (alarms) {
+            alarms.remove(Objects.requireNonNull(data, "alarm data can't be null"));
+        }
+    }
+    
+    public boolean hasAlarm(AlarmData data) {
+        synchronized (alarms) {
+            return alarms.contains(Objects.requireNonNull(data, "alarm data can't be null"));
         }
     }
     
