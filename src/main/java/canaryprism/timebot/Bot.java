@@ -1136,7 +1136,9 @@ public class Bot {
                             .append(formatDuration(e.getDuration()))
                             .append(" with ")
                             .append(formatDuration(Duration.between(now, e.getTargetTime())))
-                            .append(" left");
+                            .append(" left in channel <#")
+                            .append(e.getChannel().getIdAsString())
+                            .append('>');
                 }
                 
                 return sb.toString();
@@ -1257,6 +1259,10 @@ public class Bot {
                     if (!repeating.isEmpty())
                         sb.append(" repeating ")
                             .append(repeating);
+
+                    sb.append(" in channel <#")
+                            .append(e.getChannel().getIdAsString())
+                            .append('>');
                 }
                 
                 return sb.toString();
