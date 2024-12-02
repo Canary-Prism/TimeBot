@@ -436,6 +436,9 @@ public class Bot {
     }
     
     public static String formatDuration(Duration duration) {
+        if (duration.isNegative())
+            return "negative time";
+
         class Regexes {
             static final Pattern PLURAL_DAYS = Pattern.compile("\\b1 days\\b");
             static final Pattern PLURAL_HOURS = Pattern.compile("\\b1 hours\\b");
