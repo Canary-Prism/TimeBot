@@ -119,6 +119,8 @@ public class Bot {
         
         
         refreshBirthdayTimers();
+        refreshTimers();
+        refreshAlarms();
         
         logger.info("Bot started normally");
     }
