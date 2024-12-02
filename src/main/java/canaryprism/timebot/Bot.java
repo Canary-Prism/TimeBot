@@ -516,7 +516,7 @@ public class Bot {
                     .flatMap(UserData::getTimezone);
             
             if (opt_timezone.isEmpty())
-                return String.format("User %s has no timezone set! Set a timezone with `/timezone set`", user.getMentionTag());
+                return String.format("Error: User %s has no timezone set! Set a timezone with `/timezone set`", user.getMentionTag());
             
             var timezone = opt_timezone.get();
             
@@ -593,7 +593,7 @@ public class Bot {
                             Preview: %s
                             """, timezone, previewTime(interaction));
                 } catch (DateTimeException e) {
-                    return String.format("Timezone of id '%s' not found", timezone_query);
+                    return String.format("Error: Timezone of id '%s' not found", timezone_query);
                 }
             }
             
@@ -647,7 +647,7 @@ public class Bot {
                         .flatMap((e) -> e.getUserData(user))
                         .flatMap(UserData::getTimezone)
                         .map((e) -> String.format("Your current set timezone is %s", e))
-                        .orElse("You don't have a timezone set");
+                        .orElse("Error: You don't have a timezone set! you can set one with `/timezone set`");
             }
             
             @Command(name = "setvisible", description = "set whether your timezone is visible to others")
@@ -672,7 +672,7 @@ public class Bot {
                             .orElse(true);
                     
                     if (current_state == state)
-                        return String.format("Your timezone visibility is already set to %s", current_state);
+                        return String.format("Error: Your timezone visibility is already set to %s", current_state);
                     
                     var data = bot_data.obtainServerData(server).obtainUserData(interaction.getUser());
                     
@@ -685,7 +685,7 @@ public class Bot {
                             Preview: %s
                             """, state, previewTime(interaction));
                 } catch (DateTimeException e) {
-                    return String.format("Timezone of id '%s' not found", state);
+                    return String.format("Error: Timezone of id '%s' not found", state);
                 }
             }
             
@@ -701,7 +701,7 @@ public class Bot {
                         .flatMap((e) -> e.getUserData(user));
                 
                 if (data.flatMap(UserData::getTimezone).isEmpty())
-                    return "You don't have timezone information in this server already";
+                    return "Error: You don't have timezone information in this server already";
                 
                 data.get().setTimezone(null);
                 
@@ -741,16 +741,16 @@ public class Bot {
                             """, pattern, previewTime(interaction));
 
                 } catch (IllegalArgumentException e) {
-                    return String.format("Invalid DateTimeFormat pattern: `%s`", pattern);
+                    return String.format("Error: Invalid DateTimeFormat pattern: `%s`", pattern);
                 } catch (DateTimeException e) {
-                    return "Pattern may only request timezone information in square brackets (to indicate optionalness)";
+                    return "Error: Pattern may only request timezone information in square brackets (to indicate optionalness)";
                 }
             } else {
                 var opt_data = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(interaction.getUser()));
                 
                 if (opt_data.flatMap(UserData::getFormatter).isEmpty())
-                    return "No operation performed";
+                    return "Error: No operation performed";
                 
                 @SuppressWarnings("OptionalGetWithoutIsPresent")
                 var old_formatter = opt_data.get().getFormatterPattern().get();
@@ -784,7 +784,7 @@ public class Bot {
                 var locale = Locale.forLanguageTag(language_tag);
                 
                 if (LocaleUtils.isLanguageUndetermined(locale))
-                    return String.format("Unrecognised language tag `%s`", language_tag);
+                    return String.format("Error: Unrecognised language tag `%s`", language_tag);
                 
                 bot_data.obtainServerData(server)
                         .obtainUserData(interaction.getUser())
@@ -801,7 +801,7 @@ public class Bot {
                         .flatMap((e) -> e.getUserData(interaction.getUser()));
                 
                 if (opt_data.flatMap(UserData::getLocale).isEmpty())
-                    return "No operation performed";
+                    return "Error: No operation performed";
                 
                 @SuppressWarnings("OptionalGetWithoutIsPresent")
                 var old_locale = opt_data.get().getLocale().get();
@@ -931,13 +931,13 @@ public class Bot {
                     logger.trace("/moderation birthdaychannel add command; user: {}, server: {}, channel: {}", interaction.getUser(), server, channel);
                     
                     if (!(channel instanceof TextableRegularServerChannel text_channel))
-                        return "Not a textable channel";
+                        return "Error: Not a textable channel";
                     
                     if (bot_data.getServerData(server)
                             .map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(text_channel))
                             .orElse(false))
-                        return String.format("%s already an allowed birthday channel", text_channel.getMentionTag());
+                        return String.format("Error: %s already an allowed birthday channel", text_channel.getMentionTag());
                     
                     var data = bot_data.obtainServerData(server);
                     
@@ -959,22 +959,22 @@ public class Bot {
                     logger.trace("/moderation birthdaychannel remove command; user: {}, server: {}, target_channel: {}, fallback_channel: {}", interaction.getUser(), server, target_channel, fallback_channel);
                     
                     if (!(target_channel instanceof TextableRegularServerChannel target_text_channel))
-                        return String.format("<#%s> not a textable channel", target_channel.getIdAsString());
+                        return String.format("Error: <#%s> not a textable channel", target_channel.getIdAsString());
                     
                     if (!(fallback_channel instanceof TextableRegularServerChannel fallback_text_channel))
-                        return String.format("<#%s> not a textable channel", fallback_channel.getIdAsString());
+                        return String.format("Error: <#%s> not a textable channel", fallback_channel.getIdAsString());
                     
                     var data = bot_data.getServerData(server);
                     
                     if (!data.map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(target_text_channel))
                             .orElse(false))
-                        return String.format("%s isn't an allowed birthday channel", target_text_channel.getMentionTag());
+                        return String.format("Error: %s isn't an allowed birthday channel", target_text_channel.getMentionTag());
                     
                     if (!data.map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(fallback_text_channel))
                             .orElse(false))
-                        return String.format("%s isn't an allowed birthday channel", fallback_text_channel.getMentionTag());
+                        return String.format("Error: %s isn't an allowed birthday channel", fallback_text_channel.getMentionTag());
                     
                     data.get().removeAllowedBirthdayChannel(target_text_channel);
                     
@@ -1016,7 +1016,7 @@ public class Bot {
                 logger.trace("/birthday set command; user: {}, server: {}", interaction.getUser(), server);
                 
                 if (!(channel instanceof TextableRegularServerChannel text_channel))
-                    return String.format("<#%s> not a textable channel", channel.getIdAsString());
+                    return String.format("Error: <#%s> not a textable channel", channel.getIdAsString());
                 
                 var allowed_channels = bot_data.getServerData(server)
                         .map(ServerData::getAllowedBirthdayChannels);
@@ -1024,12 +1024,12 @@ public class Bot {
                 if (!allowed_channels.map((e) -> e.contains(channel)).orElse(false)) {
                     if (allowed_channels.map(Set::isEmpty).orElse(true))
                         return """
-                                This server doesn't allow any birthday notifications
+                                Error: This server doesn't allow any birthday notifications
                                 if you're a moderator you can add one with `/moderation birthdaychannel add`
                                 """;
                     else
                         return String.format("""
-                                %s is not in the allowed birthday notification channels
+                                Error: %s is not in the allowed birthday notification channels
                                 allowed channels: %s
                                 """,
                                 text_channel.getMentionTag(),
@@ -1081,7 +1081,7 @@ public class Bot {
                     
                     return String.format("Set birthday notification to %s", formatter.format(birthday));
                 } catch (DateTimeException e) {
-                    return String.format("Invalid date: %s", e.getMessage());
+                    return String.format("Error: Invalid date: %s", e.getMessage());
                 }
             }
             
@@ -1096,7 +1096,7 @@ public class Bot {
                         .flatMap((e) -> e.getUserData(user));
                 
                 if (data.flatMap(UserData::getBirthdayData).isEmpty())
-                    return "You don't have any birthday data";
+                    return "Error: You don't have any birthday data";
                 
                 data.get().setBirthdayData(null);
                 
@@ -1175,7 +1175,7 @@ public class Bot {
                 
                 
                 if (duration.isNegative())
-                    return "Time specified is negative";
+                    return "Error: Time specified is negative";
                 
                 
                 var user = bot_data.obtainServerData(server)
@@ -1212,7 +1212,7 @@ public class Bot {
                 var opt_timer = opt_user.flatMap((e) -> e.getTimer(index.intValue()));
                 
                 if (opt_timer.isEmpty())
-                    return "Timer with that index does not exist";
+                    return "Error: Timer with that index does not exist";
                 
                 var user = opt_user.get();
                 var timer = opt_timer.get();
@@ -1295,7 +1295,7 @@ public class Bot {
                         .flatMap(UserData::getTimezone);
                 
                 if (opt_timezone.isEmpty())
-                    return "You don't have a timezone set! you can set one with `/timezone set`";
+                    return "Error: You don't have a timezone set! you can set one with `/timezone set`";
                 
                 var user = bot_data.obtainServerData(server)
                         .obtainUserData(interaction.getUser());
@@ -1350,7 +1350,7 @@ public class Bot {
                         .flatMap((e) -> e.getAlarm(index.intValue()));
                 
                 if (opt_alarm.isEmpty()) {
-                    return "Alarm of that index doesn't exist";
+                    return "Error: Alarm of that index doesn't exist";
                 }
                 
                 var alarm = opt_alarm.get();
@@ -1394,7 +1394,7 @@ public class Bot {
                         .flatMap((e) -> e.getAlarm(index.intValue()));
 
                 if (opt_alarm.isEmpty()) {
-                    return "Alarm of that index doesn't exist";
+                    return "Error: Alarm of that index doesn't exist";
                 }
 
                 var alarm = opt_alarm.get();
@@ -1408,7 +1408,7 @@ public class Bot {
                     return String.format("Added %s to repeating days for alarm %s",
                             day_of_week_option.getCustomName(), index);
                 else
-                    return String.format("Alarm %s already repeats %s",
+                    return String.format("Error: Alarm %s already repeats %s",
                             index, day_of_week_option.getCustomName());
             }
 
@@ -1428,7 +1428,7 @@ public class Bot {
                         .flatMap((e) -> e.getAlarm(index.intValue()));
 
                 if (opt_alarm.isEmpty()) {
-                    return "Alarm of that index doesn't exist";
+                    return "Error: Alarm of that index doesn't exist";
                 }
 
                 var alarm = opt_alarm.get();
@@ -1442,7 +1442,7 @@ public class Bot {
                     return String.format("Removed %s from repeating days for alarm %s",
                             day_of_week_option.getCustomName(), index);
                 else
-                    return String.format("Alarm %s already doesn't repeat %s",
+                    return String.format("Error: Alarm %s already doesn't repeat %s",
                             index, day_of_week_option.getCustomName());
             }
         }
