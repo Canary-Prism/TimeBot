@@ -28,6 +28,7 @@ import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.message.mention.AllowedMentions;
 import org.javacord.api.entity.message.mention.AllowedMentionsBuilder;
 import org.javacord.api.entity.permission.PermissionType;
+import org.javacord.api.entity.server.Server;
 import org.javacord.api.entity.user.User;
 import org.javacord.api.interaction.DiscordLocale;
 import org.javacord.api.interaction.SlashCommandInteraction;
@@ -481,6 +482,15 @@ public class Bot {
         public String getCustomName() {
             return choice_name;
         }
+    }
+
+    private boolean canCustomMessages(User user, Server server) {
+        if (server.getAllowedPermissions(user).contains(PermissionType.MANAGE_MESSAGES))
+            return true;
+
+        return bot_data.getServerData(server)
+                .flatMap(ServerData::allowsCustomMessages)
+                .orElse(false);
     }
     
     @CreateGlobal
@@ -991,6 +1001,48 @@ public class Bot {
                     return String.format("Removed %s from allowed birthday channels", target_text_channel.getMentionTag());
                 }
             }
+
+            @CommandGroup(name = "custommessage")
+            class CustomMessage {
+                @Command(name = "enable", description = "enable custom messages in this server for all users")
+                String enable(@Interaction SlashCommandInteraction interaction) {
+                    var server = interaction.getServer().orElseThrow();
+                    logger.trace("/moderation custommessage enable command; user: {}, server: {}", interaction.getUser(), server);
+
+                    var state = bot_data.getServerData(server)
+                            .flatMap(ServerData::allowsCustomMessages)
+                            .orElse(false);
+
+                    if (state)
+                        return "Error: Server already allows custom messages";
+
+                    bot_data.obtainServerData(server)
+                            .setAllowsCustomMessages(true);
+
+                    saveAsync();
+
+                    return "Set server to allow custom messages for all users";
+                }
+                @Command(name = "disable", description = "disable custom messages in this server for all users")
+                String disable(@Interaction SlashCommandInteraction interaction) {
+                    var server = interaction.getServer().orElseThrow();
+                    logger.trace("/moderation custommessage disable command; user: {}, server: {}", interaction.getUser(), server);
+
+                    var state = bot_data.getServerData(server)
+                            .flatMap(ServerData::allowsCustomMessages)
+                            .orElse(false);
+
+                    if (!state)
+                        return "Error: Server already disallows custom messages";
+
+                    bot_data.obtainServerData(server)
+                            .setAllowsCustomMessages(false);
+
+                    saveAsync();
+
+                    return "Set server to disallow custom messages for all users";
+                }
+            }
         }
         
         @CommandGroup(name = "birthday", enabledInDMs = false)
@@ -1161,6 +1213,13 @@ public class Bot {
             ) {
                 var server = interaction.getServer().orElseThrow();
                 logger.trace("/timer new command; user: {}, server: {}", interaction.getUser(), server);
+
+                if (!canCustomMessages(interaction.getUser(), server)) {
+                    return """
+                            You can't use custom messages in this server!
+                            Moderators may enable all users to set custom messages with `/moderation custommessage enable`
+                            """;
+                }
                 
                 long
                         days = opt_days.orElse(0L),
@@ -1289,6 +1348,13 @@ public class Bot {
             ) {
                 var server = interaction.getServer().orElseThrow();
                 logger.trace("/alarm new command; user: {}, server: {}", interaction.getUser(), server);
+
+                if (!canCustomMessages(interaction.getUser(), server)) {
+                    return """
+                            You can't use custom messages in this server!
+                            Moderators may enable all users to set custom messages with `/moderation custommessage enable`
+                            """;
+                }
                 
                 var opt_timezone = bot_data.getServerData(server)
                         .flatMap((e) -> e.getUserData(interaction.getUser()))

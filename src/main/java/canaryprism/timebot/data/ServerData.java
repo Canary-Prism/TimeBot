@@ -19,6 +19,8 @@ public class ServerData {
     private volatile MessageFlag forced_message_flags;
     
     private final Set<TextableRegularServerChannel> allowed_birthday_channels = new HashSet<>();
+
+    private volatile Boolean allow_custom_messages;
     
     public ServerData(Server server) {
         this.server = Objects.requireNonNull(server, "server cannot be null");
@@ -40,6 +42,8 @@ public class ServerData {
             var channel = (TextableRegularServerChannel) server.getChannelById(((long) e)).orElseThrow();
             allowed_birthday_channels.add(channel);
         }
+
+        this.allow_custom_messages = json.optBooleanObject("allow_custom_messages", null);
     }
     
     public JSONObject toJSON() {
@@ -55,6 +59,8 @@ public class ServerData {
                             .collect(Collectors.toUnmodifiableSet())));
             
             getForcedMessageFlag().ifPresent((e) -> json.put("forced_message_flags", e.getId()));
+
+            allowsCustomMessages().ifPresent((e) -> json.put("allow_custom_messages", e));
             
             return json;
         }
@@ -127,5 +133,13 @@ public class ServerData {
         synchronized (allowed_birthday_channels) {
             return allowed_birthday_channels.contains(channel);
         }
+    }
+
+    public Optional<Boolean> allowsCustomMessages() {
+        return Optional.ofNullable(allow_custom_messages);
+    }
+
+    public void setAllowsCustomMessages(boolean allow_custom_messages) {
+        this.allow_custom_messages = allow_custom_messages;
     }
 }
