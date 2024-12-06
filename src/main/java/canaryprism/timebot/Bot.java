@@ -1005,6 +1005,7 @@ public class Bot {
             @CommandGroup(name = "custommessage")
             class CustomMessage {
                 @Command(name = "enable", description = "enable custom messages in this server for all users")
+                @ReturnsResponse(ephemeral = true)
                 String enable(@Interaction SlashCommandInteraction interaction) {
                     var server = interaction.getServer().orElseThrow();
                     logger.trace("/moderation custommessage enable command; user: {}, server: {}", interaction.getUser(), server);
@@ -1024,6 +1025,7 @@ public class Bot {
                     return "Set server to allow custom messages for all users";
                 }
                 @Command(name = "disable", description = "disable custom messages in this server for all users")
+                @ReturnsResponse(ephemeral = true)
                 String disable(@Interaction SlashCommandInteraction interaction) {
                     var server = interaction.getServer().orElseThrow();
                     logger.trace("/moderation custommessage disable command; user: {}, server: {}", interaction.getUser(), server);
