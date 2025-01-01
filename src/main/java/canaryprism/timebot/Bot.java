@@ -501,12 +501,6 @@ public class Bot {
             logger.trace("/ping command");
             return "Pong !";
         }
-
-        @Command(name = "echolocale", description = "no description")
-        @ReturnsResponse(ephemeral = true)
-        String echolocale(@Interaction SlashCommandInteraction interaction) {
-            return interaction.getLocale().getLocaleCode();
-        }
         
         @Command(name = "time", description = "get a user's time (the user needs to have a timezone set)", enabledInDMs = false)
         @ReturnsResponse(ephemeral = true)
