@@ -501,6 +501,12 @@ public class Bot {
             logger.trace("/ping command");
             return "Pong !";
         }
+
+        @Command(name = "echolocale", description = "no description")
+        @ReturnsResponse(ephemeral = true)
+        String echolocale(@Interaction SlashCommandInteraction interaction) {
+            return interaction.getLocale().getLocaleCode();
+        }
         
         @Command(name = "time", description = "get a user's time (the user needs to have a timezone set)", enabledInDMs = false)
         @ReturnsResponse(ephemeral = true)
@@ -888,7 +894,7 @@ public class Bot {
             return formatter.format(time);
         }
         
-        @RequiresPermissions(PermissionType.MANAGE_MESSAGES)
+        @RequiresPermissions(canaryprism.discordbridge.api.server.permission.PermissionType.MANAGE_MESSAGES)
         @CommandGroup(name = "moderation", enabledInDMs = false)
         class Moderation {
             
@@ -997,7 +1003,7 @@ public class Bot {
                             .forEach((e) -> e.setChannel(fallback_text_channel));
                     
                     saveAsync();
-                    
+
                     return String.format("Removed %s from allowed birthday channels", target_text_channel.getMentionTag());
                 }
             }

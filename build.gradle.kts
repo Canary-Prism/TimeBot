@@ -24,7 +24,7 @@ repositories {
 
 dependencies {
     implementation("org.javacord:javacord:3.8.0")
-    implementation("io.github.canary-prism:slavacord:3.0.2")
+    implementation("io.github.canary-prism:slavacord:5.1.2")
     implementation("org.json:json:20240303")
     implementation("org.apache.logging.log4j:log4j-core:2.23.1")
     implementation("dev.dirs:directories:26")
