@@ -14,7 +14,7 @@
         </File>
     </Appenders>
     <Loggers>
-        <Logger name="net.dv8tion.jda" level="DEBUG">
+        <Logger name="net.dv8tion.jda" level="INFO">
             <AppenderRef ref="FileAppender"/>
         </Logger>
         <Logger name="canaryprism.slavacord" level="DEBUG">
