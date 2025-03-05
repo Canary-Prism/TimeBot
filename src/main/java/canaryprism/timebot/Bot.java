@@ -930,6 +930,8 @@ public class Bot {
                         @Interaction CommandInteractionPayload interaction,
                         @Option(name = "channel", description = "the channel to allow") GuildMessageChannel channel
                 ) {
+                    if (interaction.getIntegrationOwners().getAuthorizingGuildId() == null)
+                        return "Error: bot must be added to server first";
                     if (insufficientPermission(interaction))
                         return "Error: insufficient permissions (Manage Messages required)";
 
@@ -961,6 +963,8 @@ public class Bot {
                         @Option(name = "target_channel", description = "the channel to disallow") GuildMessageChannel target_channel,
                         @Option(name = "fallback_channel", description = "the channel to set birthdays targeting target_channel to change to") GuildMessageChannel fallback_channel
                 ) {
+                    if (interaction.getIntegrationOwners().getAuthorizingGuildId() == null)
+                        return "Error: bot must be added to server first";
                     if (insufficientPermission(interaction))
                         return "Error: insufficient permissions (Manage Messages required)";
 
