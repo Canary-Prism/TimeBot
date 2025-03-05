@@ -870,8 +870,9 @@ public class Bot {
             boolean insufficientPermission(CommandInteractionPayload payload) {
                 var interaction = ((SlashCommandInteraction) payload);
 
-                return !Optional.ofNullable(interaction.getIntegrationOwners().getAuthorizingGuildId())
-                        .map((e) -> interaction.getGuild())
+                return !Optional.of(interaction)
+                        .filter((e) -> e.getIntegrationOwners().getAuthorizingGuildId() == null)
+                        .map(SlashCommandInteraction::getGuild)
                         .map((e) -> e.getMember(interaction.getUser()))
                         .map(Member::getPermissions)
                         .map((e) -> e.contains(Permission.MESSAGE_MANAGE))
