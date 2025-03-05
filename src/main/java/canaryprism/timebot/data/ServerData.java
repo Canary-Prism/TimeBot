@@ -49,7 +49,7 @@ public class ServerData {
     public JSONObject toJSON() {
         synchronized (users) {
             var json = new JSONObject()
-                    .put("server_id", server.getId())
+                    .put("server_id", server.getIdLong())
                     .put("users", new JSONArray(users.values()
                             .parallelStream()
                             .map(UserData::toJSON)

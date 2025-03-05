@@ -34,7 +34,7 @@ public abstract class AbstractTimerData {
     public synchronized JSONObject toJSON() {
         return new JSONObject()
                 .put("target", target.toEpochMilli())
-                .put("channel", channel.getId())
+                .put("channel", channel.getIdLong())
                 .put("message", message);
     }
     

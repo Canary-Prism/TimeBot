@@ -47,7 +47,7 @@ public class BirthdayData {
                 .put("day", day)
                 .put("hour", hour)
                 .put("next_birthday_year", next_birthday_year)
-                .put("channel", channel.getId());
+                .put("channel", channel.getIdLong());
     }
     
     public synchronized void setBirthday(ZonedDateTime time) {

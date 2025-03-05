@@ -64,7 +64,7 @@ public class UserData {
     public synchronized JSONObject toJSON() {
         var json = new JSONObject();
         
-        json.put("user_id", user.getId());
+        json.put("user_id", user.getIdLong());
         
         getTimezone().ifPresent((timezone) -> json.put("timezone", timezone.getId()));
         
