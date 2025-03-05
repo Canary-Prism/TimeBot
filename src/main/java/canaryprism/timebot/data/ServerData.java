@@ -39,8 +39,12 @@ public class ServerData {
                 .orElse(null);
         
         for (var e : json.getJSONArray("allowed_birthday_channels")) {
-            var channel = (GuildMessageChannel) Objects.requireNonNull(api.getGuildChannelById(((long) e)));
-            allowed_birthday_channels.add(channel);
+            try {
+                var channel = (GuildMessageChannel) Objects.requireNonNull(api.getGuildChannelById(((long) e)));
+                allowed_birthday_channels.add(channel);
+            } catch (NullPointerException n) {
+                // do nothing ig
+            }
         }
 
         this.allow_custom_messages = json.optBooleanObject("allow_custom_messages", null);
