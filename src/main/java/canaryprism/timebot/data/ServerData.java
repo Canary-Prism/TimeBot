@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 public class ServerData {
     
-    private final Guild server;
+    private final long server_id;
     private final Map<User, UserData> users = new HashMap<>();
     
     private volatile ResponderFlags forced_message_flags;
@@ -23,11 +23,11 @@ public class ServerData {
     private volatile Boolean allow_custom_messages;
     
     public ServerData(Guild server) {
-        this.server = Objects.requireNonNull(server, "server cannot be null");
+        this.server_id = Objects.requireNonNull(server, "server cannot be null").getIdLong();
     }
     
     public ServerData(JSONObject json, JDA api) {
-        this.server = Objects.requireNonNull(api.getGuildById(json.getLong("server_id")), "server cannot be null");
+        this.server_id = json.getLong("server_id");
         
         for (var e : json.getJSONArray("users")) {
             var user_data = new UserData((JSONObject) e, api);
@@ -39,7 +39,7 @@ public class ServerData {
                 .orElse(null);
         
         for (var e : json.getJSONArray("allowed_birthday_channels")) {
-            var channel = (GuildMessageChannel) Objects.requireNonNull(server.getGuildChannelById(((long) e)));
+            var channel = (GuildMessageChannel) Objects.requireNonNull(api.getGuildChannelById(((long) e)));
             allowed_birthday_channels.add(channel);
         }
 
@@ -49,7 +49,7 @@ public class ServerData {
     public JSONObject toJSON() {
         synchronized (users) {
             var json = new JSONObject()
-                    .put("server_id", server.getIdLong())
+                    .put("server_id", server_id)
                     .put("users", new JSONArray(users.values()
                             .parallelStream()
                             .map(UserData::toJSON)
@@ -66,8 +66,8 @@ public class ServerData {
         }
     }
     
-    public Guild getServer() {
-        return this.server;
+    public long getServerId() {
+        return this.server_id;
     }
     
     public void putUserData(UserData data) {

@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class BotData {
-    private final Map<Guild, ServerData> servers = new HashMap<>();
+    private final Map<Long, ServerData> servers = new HashMap<>();
     
     public BotData() {
     }
@@ -17,7 +17,7 @@ public class BotData {
     public BotData(JSONObject json, JDA api) {
         for (var e : json.getJSONArray("servers")) {
             var data = new ServerData((JSONObject) e, api);
-            servers.put(data.getServer(), data);
+            servers.put(data.getServerId(), data);
         }
     }
     
@@ -35,20 +35,20 @@ public class BotData {
     public void putServerData(ServerData data) {
         Objects.requireNonNull(data, "data can't be null");
         synchronized (servers) {
-            servers.put(data.getServer(), data);
+            servers.put(data.getServerId(), data);
         }
     }
     
     public Optional<ServerData> getServerData(Guild server) {
         Objects.requireNonNull(server, "server can't be null");
         synchronized (servers) {
-            return Optional.ofNullable(servers.get(server));
+            return Optional.ofNullable(servers.get(server.getIdLong()));
         }
     }
     
     public ServerData obtainServerData(Guild server) {
         synchronized (servers) {
-            return servers.computeIfAbsent(Objects.requireNonNull(server, "server cannot be null"), ServerData::new);
+            return servers.computeIfAbsent(Objects.requireNonNull(server, "server cannot be null").getIdLong(), (e) -> new ServerData(server));
         }
     }
     
