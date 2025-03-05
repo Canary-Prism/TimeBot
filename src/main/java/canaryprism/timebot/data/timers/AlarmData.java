@@ -1,8 +1,8 @@
 package canaryprism.timebot.data.timers;
 
 import canaryprism.timebot.data.UserData;
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.channel.TextChannel;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import org.json.JSONObject;
 
 import java.time.*;
@@ -17,12 +17,12 @@ public class AlarmData extends AbstractTimerData {
     
     protected final EnumSet<DayOfWeek> repeating_days = EnumSet.noneOf(DayOfWeek.class);
     
-    public AlarmData(UserData owner, LocalTime time, TextChannel channel, String message) {
+    public AlarmData(UserData owner, LocalTime time, MessageChannel channel, String message) {
         super(owner, Instant.EPOCH, channel, message);
         this.local_time = time;
     }
     
-    public AlarmData(JSONObject json, DiscordApi api, UserData owner) {
+    public AlarmData(JSONObject json, JDA api, UserData owner) {
         super(json, api, owner);
         
         this.local_time = LocalTime.parse(json.getString("local_time"));

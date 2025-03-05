@@ -1,10 +1,10 @@
 package canaryprism.timebot.data;
 
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.channel.TextableRegularServerChannel;
-import org.javacord.api.entity.message.MessageFlag;
-import org.javacord.api.entity.server.Server;
-import org.javacord.api.entity.user.User;
+import canaryprism.timebot.ResponderFlags;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -13,21 +13,21 @@ import java.util.stream.Collectors;
 
 public class ServerData {
     
-    private final Server server;
+    private final Guild server;
     private final Map<User, UserData> users = new HashMap<>();
     
-    private volatile MessageFlag forced_message_flags;
+    private volatile ResponderFlags forced_message_flags;
     
-    private final Set<TextableRegularServerChannel> allowed_birthday_channels = new HashSet<>();
+    private final Set<GuildMessageChannel> allowed_birthday_channels = new HashSet<>();
 
     private volatile Boolean allow_custom_messages;
     
-    public ServerData(Server server) {
+    public ServerData(Guild server) {
         this.server = Objects.requireNonNull(server, "server cannot be null");
     }
     
-    public ServerData(JSONObject json, DiscordApi api) {
-        this.server = api.getServerById(json.getLong("server_id")).orElseThrow();
+    public ServerData(JSONObject json, JDA api) {
+        this.server = Objects.requireNonNull(api.getGuildById(json.getLong("server_id")), "server cannot be null");
         
         for (var e : json.getJSONArray("users")) {
             var user_data = new UserData((JSONObject) e, api);
@@ -35,11 +35,11 @@ public class ServerData {
         }
         
         this.forced_message_flags = Optional.ofNullable(json.optIntegerObject("forced_message_flags", null))
-                .map(MessageFlag::getFlagTypeById)
+                .map(ResponderFlags::fromId)
                 .orElse(null);
         
         for (var e : json.getJSONArray("allowed_birthday_channels")) {
-            var channel = (TextableRegularServerChannel) server.getChannelById(((long) e)).orElseThrow();
+            var channel = (GuildMessageChannel) Objects.requireNonNull(server.getGuildChannelById(((long) e)));
             allowed_birthday_channels.add(channel);
         }
 
@@ -55,9 +55,9 @@ public class ServerData {
                             .map(UserData::toJSON)
                             .collect(Collectors.toUnmodifiableSet())))
                     .put("allowed_birthday_channels", new JSONArray(allowed_birthday_channels.stream()
-                            .map(TextableRegularServerChannel::getId)
+                            .map(GuildMessageChannel::getId)
                             .collect(Collectors.toUnmodifiableSet())));
-            
+
             getForcedMessageFlag().ifPresent((e) -> json.put("forced_message_flags", e.getId()));
 
             allowsCustomMessages().ifPresent((e) -> json.put("allow_custom_messages", e));
@@ -66,7 +66,7 @@ public class ServerData {
         }
     }
     
-    public Server getServer() {
+    public Guild getServer() {
         return this.server;
     }
     
@@ -96,39 +96,39 @@ public class ServerData {
         }
     }
     
-    public void forceMessageFlag(MessageFlag forced_message_flags) {
+    public void forceMessageFlag(ResponderFlags forced_message_flags) {
         synchronized (this) {
             this.forced_message_flags = forced_message_flags;
         }
     }
     
-    public Optional<MessageFlag> getForcedMessageFlag() {
+    public Optional<ResponderFlags> getForcedMessageFlag() {
         synchronized (this) {
             return Optional.ofNullable(this.forced_message_flags);
         }
     }
     
-    public Set<TextableRegularServerChannel> getAllowedBirthdayChannels() {
+    public Set<GuildMessageChannel> getAllowedBirthdayChannels() {
         synchronized (allowed_birthday_channels) {
             return Set.copyOf(allowed_birthday_channels);
         }
     }
     
-    public boolean addAllowedBirthdayChannel(TextableRegularServerChannel channel) {
+    public boolean addAllowedBirthdayChannel(GuildMessageChannel channel) {
         Objects.requireNonNull(channel, "channel can't be null");
         synchronized (allowed_birthday_channels) {
             return allowed_birthday_channels.add(channel);
         }
     }
     
-    public boolean removeAllowedBirthdayChannel(TextableRegularServerChannel channel) {
+    public boolean removeAllowedBirthdayChannel(GuildMessageChannel channel) {
         Objects.requireNonNull(channel, "channel can't be null");
         synchronized (allowed_birthday_channels) {
             return allowed_birthday_channels.remove(channel);
         }
     }
     
-    public boolean isAllowedBirthdayChannel(TextableRegularServerChannel channel) {
+    public boolean isAllowedBirthdayChannel(GuildMessageChannel channel) {
         Objects.requireNonNull(channel, "channel can't be null");
         synchronized (allowed_birthday_channels) {
             return allowed_birthday_channels.contains(channel);

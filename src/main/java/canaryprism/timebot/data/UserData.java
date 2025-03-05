@@ -2,8 +2,8 @@ package canaryprism.timebot.data;
 
 import canaryprism.timebot.data.timers.AlarmData;
 import canaryprism.timebot.data.timers.TimerData;
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.user.User;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.User;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -25,13 +25,13 @@ public class UserData {
     
     private final ArrayList<TimerData> timers = new ArrayList<>();
     private final ArrayList<AlarmData> alarms = new ArrayList<>();
-    
+
     public UserData(User user) {
         this.user = Objects.requireNonNull(user, "user cannot be null");
     }
     
-    public UserData(JSONObject json, DiscordApi api) {
-        this.user = api.getUserById(json.getLong("user_id")).join();
+    public UserData(JSONObject json, JDA api) {
+        this.user = api.retrieveUserById(json.getLong("user_id")).complete();
         
         this.timezone = Optional.ofNullable(json.optString("timezone", null)).map(ZoneId::of).orElse(null);
         

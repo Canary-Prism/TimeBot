@@ -1,8 +1,8 @@
 package canaryprism.timebot;
 
 import dev.dirs.ProjectDirectories;
-import org.javacord.api.DiscordApiBuilder;
-import org.javacord.api.entity.intent.Intent;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 @CommandLine.Command(
         subcommands = Main.SetToken.class
@@ -35,16 +36,16 @@ public class Main implements Runnable {
             
             var token = Files.readString(token_file);
             
-            var api = new DiscordApiBuilder()
-                    .setToken(token)
-                    .setIntents(Intent.GUILD_MESSAGE_REACTIONS)
-                    .login()
-                    .join();
+            var api = JDABuilder.create(token, Set.of(GatewayIntent.GUILD_MESSAGE_REACTIONS))
+                    .build()
+                    .awaitReady();
             
             var bot = new Bot(api, config_path.resolve("save.json"));
             bot.start();
         } catch (IOException e) {
             throw new NoSuchElementException("token file not found", e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
     

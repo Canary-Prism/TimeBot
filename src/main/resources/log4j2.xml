@@ -5,21 +5,19 @@
                    https://logging.apache.org/xml/ns
                    https://logging.apache.org/xml/ns/log4j-config-2.xsd">
     <Properties>
-        <Property name="log_dir">${sys:canaryprism.timebot.logdir}</Property>
+        <Property name="log_dir" value="${sys:canaryprism.timebot.logdir}"/>
     </Properties>
     <Appenders>
         <File name="FileAppender" fileName="${log_dir}/TimeBot-${date:yyyy-MM-dd_HH-mm-ss}.log">
             <ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
-            <PatternLayout>
-                <Pattern>%d{DEFAULT} [%t] %-5level %logger{36} - %msg%n</Pattern>
-            </PatternLayout>
+            <PatternLayout pattern="%d{DEFAULT} [%t] %-5level %logger{36} - %msg%n"/>
         </File>
     </Appenders>
     <Loggers>
-        <Logger name="org.javacord" level="INFO">
+        <Logger name="net.dv8tion.jda" level="DEBUG">
             <AppenderRef ref="FileAppender"/>
         </Logger>
-        <Logger name="canaryprism.slavacord" level="INFO">
+        <Logger name="canaryprism.slavacord" level="DEBUG">
             <AppenderRef ref="FileAppender"/>
         </Logger>
         <Logger name="canaryprism.timebot" level="TRACE">

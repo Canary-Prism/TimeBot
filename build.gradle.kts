@@ -23,9 +23,17 @@ repositories {
 }
 
 dependencies {
-    implementation("org.javacord:javacord:3.8.0")
-    implementation("io.github.canary-prism:slavacord:5.1.2")
+    implementation("net.dv8tion:JDA:5.3.0")
+
+    implementation("io.github.canary-prism:discord-bridge:6.0.3") {
+        exclude(module = "discord-bridge-discord4j")
+        exclude(module = "discord-bridge-javacord")
+        exclude(module = "discord-bridge-kord")
+    }
+    implementation("io.github.canary-prism:slavacord:7.0.7")
     implementation("org.json:json:20240303")
+
+    runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.24.3")
     implementation("org.apache.logging.log4j:log4j-core:2.23.1")
     implementation("dev.dirs:directories:26")
     implementation("info.picocli:picocli:4.7.6")
@@ -40,6 +48,7 @@ tasks.test {
 }
 
 tasks.shadowJar {
+    mergeServiceFiles()
     archiveClassifier = ""
 }
 

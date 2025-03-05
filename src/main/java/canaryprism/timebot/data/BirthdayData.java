@@ -1,7 +1,7 @@
 package canaryprism.timebot.data;
 
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.channel.TextableRegularServerChannel;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import org.json.JSONObject;
 
 import java.time.Instant;
@@ -19,14 +19,14 @@ public class BirthdayData {
     
     private volatile int next_birthday_year;
     
-    private volatile TextableRegularServerChannel channel;
+    private volatile GuildMessageChannel channel;
     
-    public BirthdayData(ZonedDateTime time, TextableRegularServerChannel channel) {
+    public BirthdayData(ZonedDateTime time, GuildMessageChannel channel) {
         this.setBirthday(time);
         this.setChannel(channel);
     }
     
-    public BirthdayData(JSONObject json, DiscordApi api) {
+    public BirthdayData(JSONObject json, JDA api) {
         this.year = json.optIntegerObject("year", null);
         this.month = json.getInt("month");
         this.day = json.getInt("day");
@@ -34,7 +34,7 @@ public class BirthdayData {
         
         this.next_birthday_year = json.getInt("next_birthday_year");
         
-        this.channel = ((TextableRegularServerChannel) api.getChannelById(json.getLong("channel")).orElseThrow());
+        this.channel = ((GuildMessageChannel) Objects.requireNonNull(api.getGuildChannelById(json.getLong("channel"))));
     }
     
     public JSONObject toJSON() {
@@ -86,11 +86,11 @@ public class BirthdayData {
         return Optional.ofNullable(year).map((e) -> this_year - e);
     }
     
-    public synchronized TextableRegularServerChannel getChannel() {
+    public synchronized GuildMessageChannel getChannel() {
         return channel;
     }
     
-    public synchronized void setChannel(TextableRegularServerChannel channel) {
+    public synchronized void setChannel(GuildMessageChannel channel) {
         this.channel = Objects.requireNonNull(channel, "channel may not be null");
     }
 }

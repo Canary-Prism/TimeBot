@@ -1,7 +1,7 @@
 package canaryprism.timebot.data;
 
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.server.Server;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -9,12 +9,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class BotData {
-    private final Map<Server, ServerData> servers = new HashMap<>();
+    private final Map<Guild, ServerData> servers = new HashMap<>();
     
     public BotData() {
     }
     
-    public BotData(JSONObject json, DiscordApi api) {
+    public BotData(JSONObject json, JDA api) {
         for (var e : json.getJSONArray("servers")) {
             var data = new ServerData((JSONObject) e, api);
             servers.put(data.getServer(), data);
@@ -39,14 +39,14 @@ public class BotData {
         }
     }
     
-    public Optional<ServerData> getServerData(Server server) {
+    public Optional<ServerData> getServerData(Guild server) {
         Objects.requireNonNull(server, "server can't be null");
         synchronized (servers) {
             return Optional.ofNullable(servers.get(server));
         }
     }
     
-    public ServerData obtainServerData(Server server) {
+    public ServerData obtainServerData(Guild server) {
         synchronized (servers) {
             return servers.computeIfAbsent(Objects.requireNonNull(server, "server cannot be null"), ServerData::new);
         }

@@ -1,8 +1,8 @@
 package canaryprism.timebot.data.timers;
 
 import canaryprism.timebot.data.UserData;
-import org.javacord.api.DiscordApi;
-import org.javacord.api.entity.channel.TextChannel;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import org.json.JSONObject;
 
 import java.time.Duration;
@@ -12,13 +12,13 @@ public class TimerData extends AbstractTimerData {
     
     protected final Duration duration;
     
-    public TimerData(UserData owner, Duration duration, TextChannel channel, String message) {
+    public TimerData(UserData owner, Duration duration, MessageChannel channel, String message) {
         super(owner, Instant.now().plus(duration), channel, message);
         
         this.duration = duration;
     }
     
-    public TimerData(JSONObject json, DiscordApi api, UserData owner) {
+    public TimerData(JSONObject json, JDA api, UserData owner) {
         super(json, api, owner);
         
         this.duration = Duration.parse(json.getString("duration"));
@@ -39,12 +39,12 @@ public class TimerData extends AbstractTimerData {
     }
     
     @Override
-    public TextChannel getChannel() {
+    public MessageChannel getChannel() {
         return channel;
     }
     
     @Override
-    public void setChannel(TextChannel channel) {
+    public void setChannel(MessageChannel channel) {
         throw new UnsupportedOperationException("can't change channel on TimerData");
     }
     
