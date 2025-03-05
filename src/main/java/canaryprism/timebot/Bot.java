@@ -23,11 +23,13 @@ import canaryprism.timebot.data.timers.TimerData;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
+import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.logging.log4j.LogManager;
@@ -864,6 +866,17 @@ public class Bot {
         @RequiresPermissions(PermissionType.MANAGE_MESSAGES)
         @CommandGroup(name = "moderation")
         class Moderation {
+
+            boolean insufficientPermission(CommandInteractionPayload payload) {
+                var interaction = ((SlashCommandInteraction) payload);
+
+                return !Optional.ofNullable(interaction.getIntegrationOwners().getAuthorizingGuildId())
+                        .map((e) -> interaction.getGuild())
+                        .map((e) -> e.getMember(interaction.getUser()))
+                        .map(Member::getPermissions)
+                        .map((e) -> e.contains(Permission.MESSAGE_MANAGE))
+                        .orElse(true);
+            }
             
             @CommandGroup(name = "forcemessageflag")
             class ForceMessageFlag {
@@ -873,6 +886,9 @@ public class Bot {
                         @Interaction CommandInteractionPayload interaction,
                         @Option(name = "flag", description = "the flag to set, if empty removes the forced message flag") Optional<ResponderFlags> opt_flag
                 ) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     
                     logger.trace("/moderation forcemessageflag set command; user: {}, server: {}, flag: {}", interaction.getUser(), server, opt_flag);
@@ -891,6 +907,9 @@ public class Bot {
                 @Command(name = "get", description = "get forced message flag for /time responses")
                 @ReturnsResponse(ephemeral = true)
                 String get(@Interaction CommandInteractionPayload interaction) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation forcemessageflag get command; user: {}, server: {}", interaction.getUser(), server);
                     
@@ -910,6 +929,9 @@ public class Bot {
                         @Interaction CommandInteractionPayload interaction,
                         @Option(name = "channel", description = "the channel to allow") GuildMessageChannel channel
                 ) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation birthdaychannel add command; user: {}, server: {}, channel: {}", interaction.getUser(), server, channel);
                     
@@ -938,6 +960,9 @@ public class Bot {
                         @Option(name = "target_channel", description = "the channel to disallow") GuildMessageChannel target_channel,
                         @Option(name = "fallback_channel", description = "the channel to set birthdays targeting target_channel to change to") GuildMessageChannel fallback_channel
                 ) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation birthdaychannel remove command; user: {}, server: {}, target_channel: {}, fallback_channel: {}", interaction.getUser(), server, target_channel, fallback_channel);
                     
@@ -980,6 +1005,9 @@ public class Bot {
                 @Command(name = "enable", description = "enable custom messages in this server for all users")
                 @ReturnsResponse(ephemeral = true)
                 String enable(@Interaction CommandInteractionPayload interaction) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation custommessage enable command; user: {}, server: {}", interaction.getUser(), server);
 
@@ -1000,6 +1028,9 @@ public class Bot {
                 @Command(name = "disable", description = "disable custom messages in this server for all users")
                 @ReturnsResponse(ephemeral = true)
                 String disable(@Interaction CommandInteractionPayload interaction) {
+                    if (insufficientPermission(interaction))
+                        return "Error: insufficient permissions (Manage Messages required)";
+
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation custommessage disable command; user: {}, server: {}", interaction.getUser(), server);
 
