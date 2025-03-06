@@ -110,7 +110,8 @@ public class Bot {
         logger.info("Starting Bot");
         
         
-        command_handler.register(new GlobalInstallCommands(), true);
+        command_handler.register(new GlobalInstallCommands(), false);
+        command_handler.register(new ServerInstallCommands(), false);
         
         
         refreshBirthdayTimers();
