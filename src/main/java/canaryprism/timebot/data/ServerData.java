@@ -59,7 +59,7 @@ public class ServerData {
                             .map(UserData::toJSON)
                             .collect(Collectors.toUnmodifiableSet())))
                     .put("allowed_birthday_channels", new JSONArray(allowed_birthday_channels.stream()
-                            .map(GuildMessageChannel::getId)
+                            .map(GuildMessageChannel::getIdLong)
                             .collect(Collectors.toUnmodifiableSet())));
 
             getForcedMessageFlag().ifPresent((e) -> json.put("forced_message_flags", e.getId()));
