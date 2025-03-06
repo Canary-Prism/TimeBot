@@ -30,6 +30,7 @@ import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
+import net.dv8tion.jda.api.requests.RestAction;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.logging.log4j.LogManager;
@@ -453,7 +454,7 @@ public class Bot {
     }
 
     private boolean canCustomMessages(User user, Guild server) {
-        if (Objects.requireNonNull(server.getMember(user)).getPermissions().contains(Permission.MESSAGE_MANAGE))
+        if (Objects.requireNonNull(server.retrieveMember(user).complete()).getPermissions().contains(Permission.MESSAGE_MANAGE))
             return true;
 
         return bot_data.getServerData(server)
@@ -874,7 +875,8 @@ public class Bot {
                 return !Optional.of(interaction)
                         .filter((e) -> e.getIntegrationOwners().getAuthorizingGuildId() == null)
                         .map(SlashCommandInteraction::getGuild)
-                        .map((e) -> e.getMember(interaction.getUser()))
+                        .map((e) -> e.retrieveMember(interaction.getUser()))
+                        .map(RestAction::complete)
                         .map(Member::getPermissions)
                         .map((e) -> e.contains(Permission.MESSAGE_MANAGE))
                         .orElse(true);
