@@ -11,7 +11,7 @@ import org.json.JSONObject;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class ServerData {
+public class ServerData implements ChatData {
     
     private final long server_id;
     private final Map<User, UserData> users = new HashMap<>();

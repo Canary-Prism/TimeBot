@@ -14,10 +14,7 @@ import canaryprism.slavacord.autocomplete.annotations.Autocompleter;
 import canaryprism.slavacord.autocomplete.annotations.Autocompletes;
 import canaryprism.slavacord.autocomplete.annotations.SearchSuggestions;
 import canaryprism.slavacord.autocomplete.filteroptions.MatchStart;
-import canaryprism.timebot.data.BirthdayData;
-import canaryprism.timebot.data.BotData;
-import canaryprism.timebot.data.ServerData;
-import canaryprism.timebot.data.UserData;
+import canaryprism.timebot.data.*;
 import canaryprism.timebot.data.timers.AlarmData;
 import canaryprism.timebot.data.timers.TimerData;
 import net.dv8tion.jda.api.JDA;
@@ -112,6 +109,7 @@ public class Bot {
         
         
         command_handler.register(new GlobalInstallCommands(), false);
+        command_handler.register(new GlobalInstallServerCommands(), false);
         command_handler.register(new ServerInstallCommands(), false);
         
         
@@ -463,7 +461,7 @@ public class Bot {
     }
     
     @CreateGlobal(
-            contexts = { ContextType.SERVER },
+            contexts = { ContextType.SERVER, ContextType.OTHER_DM },
             install = { InstallationType.SERVER_INSTALL, InstallationType.USER_INSTALL }
     )
     class GlobalInstallCommands implements Commands {
@@ -489,11 +487,9 @@ public class Bot {
             
             var user = opt_user.orElse(interaction.getUser());
             
-            var server = Objects.requireNonNull(interaction.getGuild());
+            logger.trace("/time command; user: {}, target: {}", interaction.getUser(), user);
             
-            logger.trace("/time command; user: {}, server: {}, target: {}", interaction.getUser(), server, user);
-            
-            var opt_timezone = bot_data.getServerData(server)
+            var opt_timezone = bot_data.getChatData(interaction)
                     .flatMap((e) -> e.getUserData(user))
                     .flatMap(UserData::getTimezone);
             
@@ -502,18 +498,18 @@ public class Bot {
             
             var timezone = opt_timezone.get();
             
-            var timezone_visible = bot_data.getServerData(server)
+            var timezone_visible = bot_data.getChatData(interaction)
                     .flatMap((e) -> e.getUserData(user))
                     .flatMap(UserData::isTimezoneVisible)
                     .orElse(true);
             
-            var locale = bot_data.getServerData(server)
+            var locale = bot_data.getChatData(interaction)
                     .flatMap((e) -> e.getUserData(interaction.getUser()))
                     .flatMap(UserData::getLocale)
                     .orElse(interaction.getUserLocale().toLocale());
             
             
-            var formatter = bot_data.getServerData(server)
+            var formatter = bot_data.getChatData(interaction)
                     .flatMap((e) -> e.getUserData(interaction.getUser()))
                     .flatMap(UserData::getFormatter)
                     .orElse(DEFAULT_FORMATTER)
@@ -532,10 +528,9 @@ public class Bot {
             var responder = ((IReplyCallback) interaction)
                     .reply(message)
                     .setAllowedMentions(Collections.emptySet());
-            
-            Optional.ofNullable(interaction.getGuild())
-                    .flatMap(bot_data::getServerData)
-                    .flatMap(ServerData::getForcedMessageFlag)
+
+            bot_data.getChatData(interaction)
+                    .flatMap(ChatData::getForcedMessageFlag)
                     .or(() -> flag)
                     .ifPresent((e) -> {
                         switch (e) {
@@ -562,14 +557,12 @@ public class Bot {
                     @Option(name = "timezone", description = "the timezone to set to")
                     String timezone_query
             ) {
-                var server = Objects.requireNonNull(interaction.getGuild());
-                
-                logger.trace("/timezone set command; user: {}, server: {}, timezone_query: {}", interaction.getUser(), server, timezone_query);
+                logger.trace("/timezone set command; user: {}, timezone_query: {}", interaction.getUser(), timezone_query);
                 
                 try {
                     var timezone = ZoneId.of(timezone_query);
                     
-                    var data = bot_data.obtainServerData(server).obtainUserData(interaction.getUser());
+                    var data = bot_data.obtainChatData(interaction).obtainUserData(interaction.getUser());
                     
                     data.setTimezone(timezone);
                     
@@ -626,11 +619,10 @@ public class Bot {
             @Command(name = "get", description = "get your current set timezone")
             @ReturnsResponse(ephemeral = true)
             String get(@Interaction CommandInteractionPayload interaction) {
-                var server = Objects.requireNonNull(interaction.getGuild());
                 var user = interaction.getUser();
-                logger.trace("/timezone get command; user: {}, server: {}", user, server);
+                logger.trace("/timezone get command; user: {}", user);
 
-                return bot_data.getServerData(server)
+                return bot_data.getChatData(interaction)
                         .flatMap((e) -> e.getUserData(user))
                         .flatMap(UserData::getTimezone)
                         .map((e) -> String.format("Your current set timezone is %s", e))
@@ -646,14 +638,13 @@ public class Bot {
                     @Option(name = "visible", description = "whether your timezone is visible to others")
                     boolean state
             ) {
-                var server = Objects.requireNonNull(interaction.getGuild());
                 var user = interaction.getUser();
                 
-                logger.trace("/timezone setvisible command; user: {}, server: {}", user, server);
+                logger.trace("/timezone setvisible command; user: {}", user);
                 
                 try {
 
-                    var current_state = bot_data.getServerData(server)
+                    var current_state = bot_data.getChatData(interaction)
                             .flatMap((e) -> e.getUserData(user))
                             .flatMap(UserData::isTimezoneVisible)
                             .orElse(true);
@@ -661,7 +652,7 @@ public class Bot {
                     if (current_state == state)
                         return String.format("Error: Your timezone visibility is already set to %s", current_state);
                     
-                    var data = bot_data.obtainServerData(server).obtainUserData(interaction.getUser());
+                    var data = bot_data.obtainChatData(interaction).obtainUserData(interaction.getUser());
                     
                     data.setTimezoneVisible(state);
                     
@@ -679,12 +670,11 @@ public class Bot {
             @Command(name = "remove", description = "remove timezone information from the bot")
             @ReturnsResponse(ephemeral = true)
             String remove(@Interaction CommandInteractionPayload interaction) {
-                var server = Objects.requireNonNull(interaction.getGuild());
                 var user = interaction.getUser();
                 
-                logger.trace("/timezone remove command; user: {}, server: {}", user, server);
+                logger.trace("/timezone remove command; user: {}", user);
                 
-                var data = bot_data.getServerData(server)
+                var data = bot_data.getChatData(interaction)
                         .flatMap((e) -> e.getUserData(user));
                 
                 if (data.flatMap(UserData::getTimezone).isEmpty())
@@ -705,9 +695,7 @@ public class Bot {
                 @Interaction CommandInteractionPayload interaction,
                 @Option(name = "pattern", description = "the pattern to set to, if not present resets it to default") Optional<String> opt_pattern
         ) {
-            var server = Objects.requireNonNull(interaction.getGuild());
-            
-            logger.trace("/time command; user: {}, server: {}, pattern: {}", interaction.getUser(), server, opt_pattern);
+            logger.trace("/time command; user: {}, pattern: {}", interaction.getUser(), opt_pattern);
             
             if (opt_pattern.isPresent()) {
                 var pattern = opt_pattern.get();
@@ -716,7 +704,7 @@ public class Bot {
                     
                     formatter.format(LocalDateTime.now());
                     
-                    bot_data.obtainServerData(server)
+                    bot_data.obtainChatData(interaction)
                             .obtainUserData(interaction.getUser())
                             .setFormatter(pattern);
                     
@@ -733,7 +721,7 @@ public class Bot {
                     return "Error: Pattern may only request timezone information in square brackets (to indicate optionalness)";
                 }
             } else {
-                var opt_data = bot_data.getServerData(server)
+                var opt_data = bot_data.getChatData(interaction)
                         .flatMap((e) -> e.getUserData(interaction.getUser()));
                 
                 if (opt_data.flatMap(UserData::getFormatter).isEmpty())
@@ -762,8 +750,7 @@ public class Bot {
                 @StringLengthBounds(min = 1)
                 @Option(name = "language_tag", description = "the pattern to set to, if not present resets it to default") Optional<String> opt_language_tag
         ) {
-            var server = Objects.requireNonNull(interaction.getGuild());
-            logger.trace("/setlocale command; user: {}, server: {}", interaction.getUser(), server);
+            logger.trace("/setlocale command; user: {}", interaction.getUser());
             
             if (opt_language_tag.isPresent()) {
                 
@@ -773,7 +760,7 @@ public class Bot {
                 if (LocaleUtils.isLanguageUndetermined(locale))
                     return String.format("Error: Unrecognised language tag `%s`", language_tag);
                 
-                bot_data.obtainServerData(server)
+                bot_data.obtainChatData(interaction)
                         .obtainUserData(interaction.getUser())
                         .setLocale(locale);
                 
@@ -784,7 +771,7 @@ public class Bot {
                         Preview: %s
                         """, locale, previewTime(interaction));
             } else {
-                var opt_data = bot_data.getServerData(server)
+                var opt_data = bot_data.getChatData(interaction)
                         .flatMap((e) -> e.getUserData(interaction.getUser()));
                 
                 if (opt_data.flatMap(UserData::getLocale).isEmpty())
@@ -839,9 +826,7 @@ public class Bot {
         private String previewTime(CommandInteractionPayload interaction) {
             var now = Instant.now();
             
-            var server = Objects.requireNonNull(interaction.getGuild());
-            
-            var data = bot_data.getServerData(server)
+            var data = bot_data.getChatData(interaction)
                     .flatMap((e) -> e.getUserData(interaction.getUser()));
             
             var timezone = data.flatMap(UserData::getTimezone).orElse(ZoneOffset.UTC);
@@ -864,7 +849,14 @@ public class Bot {
 
             return formatter.format(time);
         }
-        
+
+    }
+
+    @CreateGlobal(
+            contexts = { ContextType.SERVER },
+            install = { InstallationType.SERVER_INSTALL }
+    )
+    class GlobalInstallServerCommands implements Commands {
         @RequiresPermissions(PermissionType.MANAGE_MESSAGES)
         @CommandGroup(name = "moderation")
         class Moderation {
@@ -881,7 +873,7 @@ public class Bot {
                         .map((e) -> e.contains(Permission.MESSAGE_MANAGE))
                         .orElse(true);
             }
-            
+
             @CommandGroup(name = "forcemessageflag")
             class ForceMessageFlag {
                 @Command(name = "set", description = "Force /time responses to use a specific message flag")
@@ -894,20 +886,20 @@ public class Bot {
                         return "Error: insufficient permissions (Manage Messages required)";
 
                     var server = Objects.requireNonNull(interaction.getGuild());
-                    
+
                     logger.trace("/moderation forcemessageflag set command; user: {}, server: {}, flag: {}", interaction.getUser(), server, opt_flag);
-                    
+
                     var data = bot_data.obtainServerData(server);
-                    
+
                     data.forceMessageFlag(opt_flag.orElse(null));
-                    
+
                     saveAsync();
-                    
+
                     return opt_flag.map(responderFlags ->
                                     String.format("Set server to force %s messages", responderFlags.name()))
                             .orElse("Set server to not force any message flags");
                 }
-                
+
                 @Command(name = "get", description = "get forced message flag for /time responses")
                 @ReturnsResponse(ephemeral = true)
                 String get(@Interaction CommandInteractionPayload interaction) {
@@ -916,7 +908,7 @@ public class Bot {
 
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation forcemessageflag get command; user: {}, server: {}", interaction.getUser(), server);
-                    
+
                     return bot_data.getServerData(server)
                             .flatMap(ServerData::getForcedMessageFlag)
                             .map((e) ->
@@ -924,7 +916,7 @@ public class Bot {
                             .orElse("Server currently doesn't force any message flags");
                 }
             }
-            
+
             @CommandGroup(name = "birthdaychannel")
             class BirthdayChannel {
                 @Command(name = "add", description = "add allowed birthday channel")
@@ -940,25 +932,25 @@ public class Bot {
 
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation birthdaychannel add command; user: {}, server: {}, channel: {}", interaction.getUser(), server, channel);
-                    
+
                     if (!(channel instanceof GuildMessageChannel text_channel))
                         return "Error: Not a textable channel";
-                    
+
                     if (bot_data.getServerData(server)
                             .map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(text_channel))
                             .orElse(false))
                         return String.format("Error: %s already an allowed birthday channel", text_channel.getAsMention());
-                    
+
                     var data = bot_data.obtainServerData(server);
-                    
+
                     data.addAllowedBirthdayChannel(text_channel);
-                    
+
                     saveAsync();
-                    
+
                     return String.format("Added %s to allowed birthday notification channels", text_channel.getAsMention());
                 }
-                
+
                 @Command(name = "remove", description = "remove allowed birthday channel")
                 @ReturnsResponse(ephemeral = true)
                 String remove(
@@ -973,27 +965,27 @@ public class Bot {
 
                     var server = Objects.requireNonNull(interaction.getGuild());
                     logger.trace("/moderation birthdaychannel remove command; user: {}, server: {}, target_channel: {}, fallback_channel: {}", interaction.getUser(), server, target_channel, fallback_channel);
-                    
+
                     if (!(target_channel instanceof GuildMessageChannel target_text_channel))
                         return String.format("Error: <#%s> not a textable channel", target_channel.getId());
-                    
+
                     if (!(fallback_channel instanceof GuildMessageChannel fallback_text_channel))
                         return String.format("Error: <#%s> not a textable channel", fallback_channel.getId());
-                    
+
                     var data = bot_data.getServerData(server);
-                    
+
                     if (!data.map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(target_text_channel))
                             .orElse(false))
                         return String.format("Error: %s isn't an allowed birthday channel", target_text_channel.getAsMention());
-                    
+
                     if (!data.map(ServerData::getAllowedBirthdayChannels)
                             .map((e) -> e.contains(fallback_text_channel))
                             .orElse(false))
                         return String.format("Error: %s isn't an allowed birthday channel", fallback_text_channel.getAsMention());
-                    
+
                     data.get().removeAllowedBirthdayChannel(target_text_channel);
-                    
+
                     data.map(ServerData::getUsers)
                             .stream()
                             .flatMap(Set::stream)
@@ -1001,7 +993,7 @@ public class Bot {
                             .flatMap(Optional::stream)
                             .filter((e) -> e.getChannel().equals(target_text_channel))
                             .forEach((e) -> e.setChannel(fallback_text_channel));
-                    
+
                     saveAsync();
 
                     return String.format("Removed %s from allowed birthday channels", target_text_channel.getAsMention());
