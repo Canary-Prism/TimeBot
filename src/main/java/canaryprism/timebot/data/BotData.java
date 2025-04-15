@@ -23,7 +23,7 @@ public class BotData {
             var data = new ServerData((JSONObject) e, api);
             servers.put(data.getServerId(), data);
         }
-        for (var e : json.getJSONArray("dms")) {
+        for (var e : json.optJSONArray("dms", new JSONArray())) {
             var data = new DmData((JSONObject) e, api);
             dms.put(data.getChannelId(), data);
         }
