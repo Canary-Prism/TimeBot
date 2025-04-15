@@ -23,7 +23,7 @@ repositories {
 }
 
 dependencies {
-    implementation("net.dv8tion:JDA:5.3.0")
+    implementation("net.dv8tion:JDA:5.3.2")
 
     implementation("io.github.canary-prism:discord-bridge:6.0.4") {
         exclude(module = "discord-bridge-discord4j")
